@@ -1,11 +1,12 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, Fragment } from 'react'
 import { useRouter } from 'next/navigation'
 import { format } from 'date-fns'
 import { ChevronRight, Upload, FileUp, X, Loader2, Download, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DatePicker } from '@/components/ui/date-picker'
+import { PdfViewer } from '@/components/ui/pdf-viewer'
 import { toast } from 'sonner'
 
 interface Evidence {
@@ -387,10 +388,9 @@ export default function DocumentsPage() {
                 const analysis = analyses[doc.id]
                 const isLoadingAnalysis = analysisLoading === doc.id
                 return (
-                  <>
+                  <Fragment key={doc.id}>
                     {/* Data row */}
                     <tr
-                      key={doc.id}
                       onClick={() => setExpandedId(isExpanded ? null : doc.id)}
                       className={`cursor-pointer transition-colors ${isExpanded ? 'bg-slate-50' : 'border-b border-slate-100 hover:bg-slate-50'}`}
                     >
@@ -607,7 +607,7 @@ export default function DocumentsPage() {
 
                             {/* Document preview */}
                             {doc.fileType?.includes('pdf') ? (
-                              <iframe src={doc.fileUrl} className="w-full h-[500px] rounded-lg border border-slate-200" />
+                              <PdfViewer fileUrl={doc.fileUrl} fileName={doc.fileName} />
                             ) : doc.fileType?.includes('word') || doc.fileName?.endsWith('.docx') ? (
                               <div className="rounded-lg border border-slate-200 bg-slate-50 p-8 text-center">
                                 <p className="text-sm text-slate-600">DOCX preview not available in local development.</p>
@@ -669,7 +669,7 @@ export default function DocumentsPage() {
                         </td>
                       </tr>
                     )}
-                  </>
+                  </Fragment>
                 )
               })}
             </tbody>
