@@ -1,26 +1,68 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-background: #ffffff;
+  --color-foreground: #1a2332;
+  --color-card: #ffffff;
+  --color-card-foreground: #1a2332;
+  --color-popover: #ffffff;
+  --color-popover-foreground: #1a2332;
+  --color-primary: #1a2332;
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #f1f5f9;
+  --color-secondary-foreground: #1a2332;
+  --color-muted: #f1f5f9;
+  --color-muted-foreground: #64748b;
+  --color-accent: #f1f5f9;
+  --color-accent-foreground: #1a2332;
+  --color-destructive: #dc2626;
+  --color-destructive-foreground: #ffffff;
+  --color-border: #e2e8f0;
+  --color-input: #e2e8f0;
+  --color-ring: #1a2332;
+  --color-navy: #1a2332;
+  --color-navy-light: #243447;
+  --color-met: #059669;
+  --color-partial: #d97706;
+  --color-gap: #dc2626;
+  --radius: 0.5rem;
+  --font-sans: var(--font-inter);
+  --font-heading: var(--font-space-grotesk);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: #f8fafc;
+  color: #1a2332;
+  font-family: var(--font-sans), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, h5, h6,
+.font-heading {
+  font-family: var(--font-heading), system-ui, sans-serif;
+}
+
+/* Ensure all inputs have white background and visible borders */
+input[type="text"],
+input[type="email"],
+input[type="date"],
+input[type="search"],
+input[type="number"],
+select,
+textarea {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #1a2332;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #94a3b8;
+}
+
+/* Sheets and dialogs must have white background */
+[data-slot="sheet-content"],
+[role="dialog"] {
+  background-color: #ffffff !important;
 }

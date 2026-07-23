@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AuditReady — Application Workflow</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Inter', -apple-system, sans-serif; background: #f8fafc; color: #1a2332; line-height: 1.6; }
+h1 { font-family: 'Space Grotesk', sans-serif; font-size: 28px; font-weight: 700; margin-bottom: 8px; }
+h2 { font-family: 'Space Grotesk', sans-serif; font-size: 20px; font-weight: 600; margin: 48px 0 16px; color: #1a2332; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; }
+h3 { font-size: 15px; font-weight: 600; margin: 24px 0 8px; color: #334155; }
+p { font-size: 14px; color: #475569; margin-bottom: 12px; }
+.container { max-width: 1100px; margin: 0 auto; padding: 48px 32px; }
+.header { margin-bottom: 48px; }
+.header p { font-size: 14px; color: #64748b; }
+
+/* Flow sections */
+.flow-section { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 32px; margin-bottom: 24px; }
+.flow-section.active { border-left: 4px solid #1a2332; }
+
+/* Screen mockups */
+.screen { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; margin: 16px 0; overflow: hidden; }
+.screen-header { background: #1a2332; color: #fff; padding: 8px 16px; font-size: 12px; font-weight: 500; display: flex; justify-content: space-between; }
+.screen-body { padding: 24px; }
+.screen-nav { background: #1a2332; width: 180px; padding: 16px; float: left; min-height: 300px; }
+.screen-nav-item { color: rgba(255,255,255,0.6); font-size: 12px; padding: 6px 8px; border-radius: 4px; margin-bottom: 2px; }
+.screen-nav-item.active { background: rgba(255,255,255,0.1); color: #fff; }
+.screen-content { margin-left: 180px; padding: 24px; }
+
+/* Components */
+.input-mock { border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px 12px; font-size: 13px; color: #334155; background: #fff; margin: 4px 0; width: 100%; }
+.btn-primary { background: #1a2332; color: #fff; padding: 8px 20px; border-radius: 6px; font-size: 13px; font-weight: 500; border: none; display: inline-block; }
+.btn-outline { border: 1px solid #cbd5e1; color: #475569; padding: 8px 20px; border-radius: 6px; font-size: 13px; background: #fff; display: inline-block; }
+.drop-zone { border: 2px dashed #cbd5e1; border-radius: 8px; padding: 32px; text-align: center; background: #f8fafc; }
+.drop-zone p { color: #64748b; font-size: 13px; }
+.badge-met { background: #ecfdf5; color: #059669; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; }
+.badge-gap { background: #fef2f2; color: #dc2626; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; }
+.badge-partial { background: #fffbeb; color: #d97706; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; }
+
+/* Checklist */
+.checklist-item { display: flex; align-items: flex-start; gap: 10px; padding: 10px 0; border-bottom: 1px solid #f1f5f9; font-size: 13px; }
+.checklist-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+.checklist-dot.green { background: #059669; }
+.checklist-dot.red { background: #dc2626; }
+.checklist-dot.gray { background: #cbd5e1; }
+
+/* Flow arrows */
+.flow-arrow { text-align: center; padding: 12px 0; color: #94a3b8; font-size: 24px; }
+
+/* Table */
+.table-mock { width: 100%; border-collapse: collapse; font-size: 12px; }
+.table-mock th { text-align: left; padding: 8px 12px; background: #f8fafc; color: #64748b; font-weight: 500; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px; border-bottom: 1px solid #e2e8f0; }
+.table-mock td { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; color: #334155; }
+
+/* Progress bar */
+.progress-bar { height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden; margin: 8px 0; }
+.progress-fill { height: 100%; display: flex; }
+.progress-green { background: #059669; }
+.progress-amber { background: #d97706; }
+.progress-red { background: #dc2626; }
+
+/* Notes */
+.note { background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 6px; padding: 12px 16px; font-size: 12px; color: #0369a1; margin: 12px 0; }
+.warning { background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 12px 16px; font-size: 12px; color: #92400e; margin: 12px 0; }
+
+/* Scenario cards */
+.scenario-cards { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin: 16px 0; }
+.scenario-card { border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; }
+.scenario-card h4 { font-size: 13px; font-weight: 600; margin-bottom: 8px; }
+.scenario-card p { font-size: 12px; margin-bottom: 0; }
+
+/* Delta items */
+.delta-item { display: flex; gap: 8px; padding: 6px 0; font-size: 13px; }
+.delta-icon { flex-shrink: 0; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<div class="header">
+  <h1>AuditReady — Application Workflow</h1>
+  <p>NDIS Plan Management Verification Audit Readiness Tool</p>
+  <p style="color: #94a3b8; font-size: 12px; margin-top: 4px;">Document version: 24 July 2026 | Production specification</p>
+</div>
+
+<!-- ============================================ -->
+<h2>1. First-Time User: Onboarding</h2>
+<!-- ============================================ -->
+
+<div class="flow-section active">
+  <h3>Screen 1 — Input (all users, all scenarios)</h3>
+  <p>User lands here when no evidence exists in the system. One screen, two numbers, multi-file upload.</p>
+  
+  <div class="screen">
+    <div class="screen-header"><span>localhost:3000/onboarding</span><span>Screen 1 of 2</span></div>
+    <div class="screen-body" style="max-width: 600px; margin: 0 auto;">
+      <h1 style="font-size: 22px; margin-bottom: 4px;">Let's get you audit-ready.</h1>
+      <p style="margin-bottom: 24px;">This takes about 5 minutes.</p>
+      
+      <div style="margin-bottom: 20px;">
+        <label style="font-size: 13px; font-weight: 500; display: block; margin-bottom: 4px;">How many participants do you currently manage?</label>
+        <div class="input-mock">1100</div>
+      </div>
+      
+      <div style="margin-bottom: 24px;">
+        <label style="font-size: 13px; font-weight: 500; display: block; margin-bottom: 4px;">How many staff (including yourself)?</label>
+        <div class="input-mock">3</div>
+      </div>
+      
+      <p style="font-weight: 500; margin-bottom: 4px;">Upload your compliance documents</p>
+      <p style="font-size: 12px; color: #64748b; margin-bottom: 12px;">Policies, certificates, staff records, previous audit evidence — whatever you have. Upload as many files as you like.</p>
+      
+      <div class="drop-zone">
+        <p style="font-size: 14px; color: #475569;">Drop files here or click to browse</p>
+        <p style="font-size: 12px; color: #94a3b8;">PDF, DOCX, PNG, JPG, XLSX — upload multiple files</p>
+      </div>
+      
+      <div style="margin: 16px 0; font-size: 13px;">
+        <div style="display: flex; align-items: center; gap: 8px; padding: 4px 0; color: #059669;">✓ NDIS_Policy_Manual_R3.docx <span style="color: #94a3b8; font-size: 11px;">245KB</span></div>
+        <div style="display: flex; align-items: center; gap: 8px; padding: 4px 0; color: #059669;">✓ Public_Liability_Insurance_2026.pdf <span style="color: #94a3b8; font-size: 11px;">89KB</span></div>
+        <div style="display: flex; align-items: center; gap: 8px; padding: 4px 0; color: #059669;">✓ Worker_Screening_Logesh.pdf <span style="color: #94a3b8; font-size: 11px;">52KB</span></div>
+        <div style="display: flex; align-items: center; gap: 8px; padding: 4px 0; color: #059669;">✓ Audit_Certificate_Apr2024.pdf <span style="color: #94a3b8; font-size: 11px;">118KB</span></div>
+        <div style="display: flex; align-items: center; gap: 8px; padding: 4px 0; color: #059669;">✓ Service_Agreement_Template.pdf <span style="color: #94a3b8; font-size: 11px;">73KB</span></div>
+      </div>
+      
+      <div class="btn-primary" style="width: 100%; text-align: center; padding: 12px; margin-top: 16px;">Continue →</div>
+      <p style="text-align: center; margin-top: 12px; font-size: 12px; color: #94a3b8;">I don't have any documents yet — <span style="text-decoration: underline;">start fresh</span></p>
+    </div>
+  </div>
+</div>
+
+<div class="flow-arrow">↓</div>
+
+<div class="flow-section">
+  <h3>Processing (loading state between screens)</h3>
+  <div class="screen">
+    <div class="screen-header"><span>Processing...</span></div>
+    <div class="screen-body" style="text-align: center; padding: 48px;">
+      <p style="font-size: 16px; font-weight: 500; color: #1a2332;">Analysing your documents...</p>
+      <div class="progress-bar" style="max-width: 300px; margin: 16px auto;">
+        <div class="progress-fill"><div class="progress-green" style="width: 80%;"></div></div>
+      </div>
+      <p style="font-size: 13px; color: #64748b;">Uploaded: 5/5 ✓ • Processing: 4 of 5 analysed</p>
+      <p style="font-size: 11px; color: #94a3b8; margin-top: 8px;">AI is reading each document and mapping to audit requirements</p>
+    </div>
+  </div>
+</div>
+
+<div class="flow-arrow">↓</div>
+
+<div class="flow-section">
+  <h3>Screen 2 — Results (AI auto-detects scenario)</h3>
+  <p>AI reads uploaded documents, determines provider's audit stage, calculates delta from last compliant state.</p>
+  
+  <div class="scenario-cards">
+    <div class="scenario-card" style="border-color: #e2e8f0;">
+      <h4>Scenario A</h4>
+      <p>Pre-first audit. Has registration but no audit history found in uploads.</p>
+    </div>
+    <div class="scenario-card" style="border-color: #1a2332; border-width: 2px;">
+      <h4>Scenario B ← 24Seven</h4>
+      <p>Renewal. Previous audit found (Apr 2024). Growth detected.</p>
+    </div>
+    <div class="scenario-card" style="border-color: #e2e8f0;">
+      <h4>Scenario C</h4>
+      <p>Mid-cycle. Recent audit + current docs. Maintenance mode.</p>
+    </div>
+  </div>
+  
+  <div class="screen">
+    <div class="screen-header"><span>localhost:3000/onboarding/results</span><span>Scenario B detected</span></div>
+    <div class="screen-body" style="max-width: 650px; margin: 0 auto;">
+      <h1 style="font-size: 20px; margin-bottom: 4px;">Preparing for your next audit</h1>
+      <p>Last audit: <strong>5 April 2024</strong> (full compliance ✓) • Next due by: <strong>~March 2027</strong></p>
+      
+      <div style="margin: 20px 0;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+          <span style="font-size: 13px; font-weight: 500;">Checklist readiness</span>
+          <span style="font-size: 20px; font-weight: 700;">75%</span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill">
+            <div class="progress-green" style="width: 55%;"></div>
+            <div class="progress-amber" style="width: 20%;"></div>
+          </div>
+        </div>
+        <p style="font-size: 12px; color: #64748b;">21 of 28 checklist items satisfied</p>
+      </div>
+      
+      <h3 style="margin-top: 24px;">What's changed since your last audit:</h3>
+      <div class="delta-item"><span class="delta-icon">⚠️</span><span>Participants: 137 → 1,100 (8x growth)</span></div>
+      <div class="delta-item"><span class="delta-icon">⚠️</span><span>Staff: 1 → 3 (2 new workers need full files)</span></div>
+      <div class="delta-item"><span class="delta-icon">⚠️</span><span>5 policies not reviewed in 2+ years</span></div>
+      <div class="delta-item"><span class="delta-icon">⚠️</span><span>3 new legislation changes since April 2024</span></div>
+      
+      <h3 style="margin-top: 24px;">Priority actions:</h3>
+      <div style="font-size: 13px; padding-left: 8px;">
+        <div style="padding: 4px 0;">1. Update organisation chart (you had 1 person, now 3)</div>
+        <div style="padding: 4px 0;">2. Complete staff files for 2 new workers</div>
+        <div style="padding: 4px 0;">3. Review and date-stamp all policies</div>
+        <div style="padding: 4px 0;">4. Add data sovereignty clause (offshore contractor)</div>
+      </div>
+      
+      <div class="btn-primary" style="margin-top: 24px;">Go to Checklist →</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================ -->
+<h2>2. Main Application: Checklist View</h2>
+<!-- ============================================ -->
+
+<div class="flow-section active">
+  <h3>/checklist — The primary view. "What does the auditor need?"</h3>
+  <p>Shows the 28-item auditor checklist with real-time satisfaction status. Upload from here ticks items automatically.</p>
+  
+  <div class="screen">
+    <div class="screen-header"><span>localhost:3000/checklist</span></div>
+    <div style="display: flex;">
+      <div class="screen-nav">
+        <div style="color: #fff; font-weight: 700; font-size: 14px; margin-bottom: 16px;">AuditReady</div>
+        <div class="screen-nav-item">Dashboard</div>
+        <div class="screen-nav-item active">Checklist</div>
+        <div class="screen-nav-item">Documents</div>
+        <div class="screen-nav-item">Standards</div>
+        <div class="screen-nav-item">Rules</div>
+        <div class="screen-nav-item">Workers</div>
+        <div class="screen-nav-item">Incidents</div>
+        <div class="screen-nav-item">Improvements</div>
+        <div class="screen-nav-item" style="margin-top: 16px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 12px;">Audit Pack</div>
+        <div class="screen-nav-item">Self-Assessment</div>
+      </div>
+      <div class="screen-content" style="flex: 1;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px;">
+          <div>
+            <h1 style="font-size: 20px;">Audit Checklist</h1>
+            <p style="font-size: 13px; color: #64748b;">Based on your auditor's requirements. Upload documents — AI maps them to checklist items.</p>
+          </div>
+          <div style="text-align: right;">
+            <span style="font-size: 24px; font-weight: 700;">21/28</span>
+            <span style="font-size: 12px; color: #64748b; display: block;">ready</span>
+          </div>
+        </div>
+        
+        <div class="drop-zone" style="padding: 20px; margin-bottom: 24px;">
+          <p style="font-size: 13px; margin: 0;">Drop any file — AI will figure out what it covers</p>
+        </div>
+        
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <h3 style="margin: 0; font-size: 14px;">Governance & Business</h3>
+          <span style="font-size: 12px; color: #64748b;">5/7</span>
+        </div>
+        
+        <div style="border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; margin-bottom: 20px;">
+          <div class="checklist-item" style="padding: 10px 16px;">
+            <span class="checklist-dot green"></span>
+            <div style="flex: 1;">
+              <div style="font-weight: 500;">Policies and procedures manual</div>
+              <div style="font-size: 11px; color: #64748b; font-style: italic;">Satisfied by: "NDIS Policy Manual R3" (complete manual)</div>
+            </div>
+          </div>
+          <div class="checklist-item" style="padding: 10px 16px;">
+            <span class="checklist-dot red"></span>
+            <div style="flex: 1;">
+              <div style="font-weight: 500;">Business plan</div>
+            </div>
+            <div class="btn-outline" style="font-size: 11px; padding: 4px 10px;">Generate</div>
+          </div>
+          <div class="checklist-item" style="padding: 10px 16px;">
+            <span class="checklist-dot green"></span>
+            <div style="flex: 1;">
+              <div style="font-weight: 500;">Organisation chart</div>
+              <div style="font-size: 11px; color: #64748b; font-style: italic;">Satisfied by: "NDIS Policy Manual R3" (Chapter 2)</div>
+            </div>
+          </div>
+          <div class="checklist-item" style="padding: 10px 16px;">
+            <span class="checklist-dot red"></span>
+            <div style="flex: 1;">
+              <div style="font-weight: 500;">Recent meeting minutes</div>
+            </div>
+          </div>
+        </div>
+        
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <h3 style="margin: 0; font-size: 14px;">Insurance & Compliance</h3>
+          <span style="font-size: 12px; color: #64748b;">1/4</span>
+        </div>
+        
+        <div style="border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; margin-bottom: 20px;">
+          <div class="checklist-item" style="padding: 10px 16px;">
+            <span class="checklist-dot red"></span>
+            <div style="flex: 1;"><div style="font-weight: 500;">Public liability insurance certificate</div></div>
+          </div>
+          <div class="checklist-item" style="padding: 10px 16px;">
+            <span class="checklist-dot red"></span>
+            <div style="flex: 1;"><div style="font-weight: 500;">Professional indemnity insurance certificate</div></div>
+          </div>
+          <div class="checklist-item" style="padding: 10px 16px;">
+            <span class="checklist-dot red"></span>
+            <div style="flex: 1;"><div style="font-weight: 500;">Workers compensation insurance</div></div>
+          </div>
+          <div class="checklist-item" style="padding: 10px 16px;">
+            <span class="checklist-dot green"></span>
+            <div style="flex: 1;">
+              <div style="font-weight: 500;">NDIS certificate of registration</div>
+              <div style="font-size: 11px; color: #64748b; font-style: italic;">Already issued ✓</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================ -->
+<h2>3. Documents Management</h2>
+<!-- ============================================ -->
+
+<div class="flow-section">
+  <h3>/documents — What you've uploaded. View, edit, delete, re-evaluate.</h3>
+  
+  <div class="screen">
+    <div class="screen-header"><span>localhost:3000/documents</span></div>
+    <div class="screen-body">
+      <h1 style="font-size: 20px; margin-bottom: 4px;">Documents</h1>
+      <p style="font-size: 13px; color: #64748b; margin-bottom: 16px;">5 uploaded documents</p>
+      
+      <table class="table-mock">
+        <thead>
+          <tr><th>Title</th><th>Category</th><th>Status</th><th>Standards</th><th>Checklist Items</th><th>Uploaded</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="font-weight: 500;">NDIS Policies & Procedures Manual R3</td>
+            <td>POLICY</td>
+            <td style="color: #059669;">current</td>
+            <td style="font-family: monospace; font-size: 11px;">VM-1.1, VM-1.2, VM-1.3, VM-1.4, VM-1.5, VM-1.6, VM-1.7</td>
+            <td>20 items</td>
+            <td>23 Jul 2026</td>
+          </tr>
+          <tr>
+            <td style="font-weight: 500;">24Seven Service Agreement - July 2025</td>
+            <td>PARTICIPANT</td>
+            <td style="color: #059669;">current</td>
+            <td style="font-family: monospace; font-size: 11px;">VM-2.1, VM-2.3</td>
+            <td>1 item</td>
+            <td>23 Jul 2026</td>
+          </tr>
+          <tr style="background: #f8fafc;">
+            <td colspan="6" style="padding: 16px;">
+              <div style="display: flex; gap: 16px; margin-bottom: 12px;">
+                <span style="font-size: 12px; color: #1a2332; text-decoration: underline;">Download</span>
+                <span style="font-size: 12px; color: #2563eb;">Re-evaluate</span>
+                <span style="font-size: 12px; color: #dc2626;">Delete</span>
+              </div>
+              <div style="font-size: 12px; font-weight: 500; color: #059669; margin-bottom: 8px;">CHECKLIST ITEMS SATISFIED (1)</div>
+              <div style="font-size: 12px; color: #475569;">● Service agreements — <em style="color: #94a3b8;">This is a Service Agreement for a participant</em></div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================ -->
+<h2>4. Standards Compliance</h2>
+<!-- ============================================ -->
+
+<div class="flow-section">
+  <h3>/standards — 15 NDIS Practice Standards with compliance status</h3>
+  
+  <div class="screen">
+    <div class="screen-header"><span>localhost:3000/standards</span></div>
+    <div class="screen-body">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+        <div>
+          <h1 style="font-size: 20px; margin-bottom: 4px;">Standards Compliance</h1>
+          <p style="font-size: 13px; color: #64748b;">Your evidence assessed against 15 NDIS Practice Standards for Plan Management verification.</p>
+        </div>
+        <span style="font-size: 24px; font-weight: 700;">20%</span>
+      </div>
+      
+      <div style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin: 16px 0;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+          <span style="font-size: 13px; font-weight: 500;">Audit Readiness</span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill">
+            <div class="progress-green" style="width: 20%;"></div>
+            <div class="progress-amber" style="width: 27%;"></div>
+            <div class="progress-red" style="width: 53%;"></div>
+          </div>
+        </div>
+        <div style="display: flex; gap: 16px; margin-top: 8px; font-size: 12px; color: #64748b;">
+          <span>● 3 met</span><span>● 4 partial</span><span>● 8 gaps</span>
+        </div>
+      </div>
+      
+      <h3 style="font-size: 14px; margin-top: 20px;">Governance & Operational Management <span style="float: right; font-weight: 400; color: #94a3b8;">3/7 met</span></h3>
+      <div style="border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
+        <div style="display: flex; align-items: center; padding: 10px 16px; gap: 10px; border-bottom: 1px solid #f1f5f9;">
+          <span class="checklist-dot" style="background: #d97706;"></span>
+          <span style="font-family: monospace; font-size: 11px; color: #94a3b8; width: 50px;">VM-1.1</span>
+          <span style="font-size: 13px; flex: 1;">Governance and Operational Management</span>
+          <span style="font-size: 11px; color: #64748b;">1 doc</span>
+          <span class="badge-partial">Partial</span>
+        </div>
+        <div style="display: flex; align-items: center; padding: 10px 16px; gap: 10px; border-bottom: 1px solid #f1f5f9;">
+          <span class="checklist-dot green"></span>
+          <span style="font-family: monospace; font-size: 11px; color: #94a3b8; width: 50px;">VM-1.2</span>
+          <span style="font-size: 13px; flex: 1;">Risk Management</span>
+          <span style="font-size: 11px; color: #64748b;">2 docs</span>
+          <span class="badge-met">Met</span>
+        </div>
+        <div style="display: flex; align-items: center; padding: 10px 16px; gap: 10px;">
+          <span class="checklist-dot" style="background: #dc2626;"></span>
+          <span style="font-family: monospace; font-size: 11px; color: #94a3b8; width: 50px;">VM-2.1</span>
+          <span style="font-size: 13px; flex: 1;">Person-Centred Supports</span>
+          <span style="font-size: 11px; color: #64748b;">0 docs</span>
+          <span class="badge-gap">Gap</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="note">Clicking a standard opens a detail page with tabs: Overview (what auditor looks for), Evidence (linked documents), Quality Indicators (pass/fail per indicator), Self-Assessment (AI-generated 300-word response).</div>
+</div>
+
+<!-- ============================================ -->
+<h2>5. Rules Engine (52 PM-Specific Rules)</h2>
+<!-- ============================================ -->
+
+<div class="flow-section">
+  <h3>/rules — Weighted compliance scoring. CRITICAL items first.</h3>
+  
+  <div class="screen">
+    <div class="screen-header"><span>localhost:3000/rules</span></div>
+    <div class="screen-body">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+        <div>
+          <h1 style="font-size: 20px; margin-bottom: 4px;">Compliance Rules</h1>
+          <p style="font-size: 13px; color: #64748b;">52 rules evaluated against your evidence. Fix CRITICAL items first.</p>
+        </div>
+        <div style="text-align: right;">
+          <div style="font-size: 36px; font-weight: 700;">0<span style="font-size: 18px; color: #94a3b8;">/100</span></div>
+          <span class="badge-gap">Not Audit-Ready</span>
+        </div>
+      </div>
+      
+      <div style="margin: 16px 0; font-size: 12px; color: #64748b;">
+        <span style="color: #dc2626; font-weight: 500;">15 CRITICAL failing</span> •
+        <span style="color: #d97706;">15 MAJOR failing</span> •
+        <span style="color: #059669;">20 passing</span>
+      </div>
+      
+      <h3 style="font-size: 13px; margin-top: 20px;">Registration</h3>
+      <div style="border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
+        <div style="display: flex; align-items: center; padding: 10px 16px; gap: 10px; border-bottom: 1px solid #f1f5f9;">
+          <span style="color: #dc2626; font-size: 14px;">✕</span>
+          <div style="flex: 1;">
+            <div style="font-size: 13px; font-weight: 500;">NDIS registration certificate uploaded and current</div>
+            <div style="font-size: 11px; color: #94a3b8; font-family: monospace;">Practice Standards Rules 2018, Part 2</div>
+          </div>
+          <span style="font-size: 11px; color: #dc2626; font-weight: 500;">CRITICAL</span>
+          <span style="font-size: 11px; color: #94a3b8;">-25</span>
+        </div>
+        <div style="display: flex; align-items: center; padding: 10px 16px; gap: 10px; border-bottom: 1px solid #f1f5f9;">
+          <span style="color: #dc2626; font-size: 14px;">✕</span>
+          <div style="flex: 1;">
+            <div style="font-size: 13px; font-weight: 500;">Public liability and professional indemnity insurance current</div>
+            <div style="font-size: 11px; color: #94a3b8; font-family: monospace;">Provider Registration Rules 2018, Rule 11</div>
+          </div>
+          <span style="font-size: 11px; color: #dc2626; font-weight: 500;">CRITICAL</span>
+          <span style="font-size: 11px; color: #94a3b8;">-25</span>
+        </div>
+        <div style="display: flex; align-items: center; padding: 10px 16px; gap: 10px;">
+          <span style="color: #059669; font-size: 14px;">✓</span>
+          <div style="flex: 1;">
+            <div style="font-size: 13px; font-weight: 500;">Renewal application lodged 6+ months before expiry</div>
+            <div style="font-size: 11px; color: #94a3b8; font-family: monospace;">Provider Registration Rules 2018, Rule 12</div>
+          </div>
+          <span style="font-size: 11px; color: #059669; font-weight: 500;">PASS</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="note">Rules are evaluated automatically when evidence is uploaded. Click "Re-evaluate" to manually trigger. Expanding a failing rule shows: what evidence is needed, how to fix it, and a link to upload.</div>
+</div>
+
+<!-- ============================================ -->
+<h2>6. Supporting Registers</h2>
+<!-- ============================================ -->
+
+<div class="flow-section">
+  <h3>/workers, /incidents, /improvements — Operational evidence that feeds compliance</h3>
+  
+  <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-top: 16px;">
+    <div style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px;">
+      <h4 style="font-size: 13px; font-weight: 600; margin-bottom: 8px;">Workers</h4>
+      <p style="font-size: 12px; color: #64748b;">3 workers. Track screening expiry, training records, supervision logs. Feeds: WF-001 (screening), WF-004 (orientation), WF-006 (training).</p>
+    </div>
+    <div style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px;">
+      <h4 style="font-size: 13px; font-weight: 600; margin-bottom: 8px;">Incidents & Complaints</h4>
+      <p style="font-size: 12px; color: #64748b;">Log incidents, investigate, resolve, link to improvements. Feeds: GOV-005 (incident register), GOV-010 (complaints register).</p>
+    </div>
+    <div style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px;">
+      <h4 style="font-size: 13px; font-weight: 600; margin-bottom: 8px;">Continuous Improvement</h4>
+      <p style="font-size: 12px; color: #64748b;">Record improvements from incidents/complaints/feedback. Shows corrective actions + evidence. Feeds: GOV-003, GOV-004.</p>
+    </div>
+  </div>
+  
+  <div class="warning" style="margin-top: 16px;">These registers satisfy checklist items "in_tool" — the auditor can view them directly in the Audit Pack portal without separate document uploads.</div>
+</div>
+
+<!-- ============================================ -->
+<h2>7. AI-Powered Actions</h2>
+<!-- ============================================ -->
+
+<div class="flow-section">
+  <h3>AI features available throughout the application</h3>
+  
+  <table class="table-mock">
+    <thead>
+      <tr><th>Action</th><th>Where triggered</th><th>What it does</th><th>Time</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td style="font-weight: 500;">Auto-classify</td>
+        <td>After every upload</td>
+        <td>Reads title + category, maps to standards + checklist items</td>
+        <td>3-5s (background)</td>
+      </tr>
+      <tr>
+        <td style="font-weight: 500;">Generate self-assessment</td>
+        <td>/standards/[code] or /self-assessment</td>
+        <td>Produces ~300 word audit response per standard citing evidence</td>
+        <td>5-10s</td>
+      </tr>
+      <tr>
+        <td style="font-weight: 500;">Gap analysis</td>
+        <td>/standards/[code]</td>
+        <td>Identifies what's specifically missing for a standard</td>
+        <td>5-10s</td>
+      </tr>
+      <tr>
+        <td style="font-weight: 500;">Generate document</td>
+        <td>Checklist [Generate] button</td>
+        <td>Creates a template document (business plan, delegation register, etc.)</td>
+        <td>5-10s</td>
+      </tr>
+      <tr>
+        <td style="font-weight: 500;">Scenario detection</td>
+        <td>Onboarding Screen 2</td>
+        <td>Reads uploads, determines A/B/C scenario, calculates delta</td>
+        <td>10-15s</td>
+      </tr>
+      <tr style="background: #f8fafc;">
+        <td style="font-weight: 500; color: #94a3b8;">Fix document (planned)</td>
+        <td>Documents page</td>
+        <td>AI reads doc, identifies what's wrong, generates corrected DOCX</td>
+        <td>—</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ============================================ -->
+<h2>8. Audit Pack & Portal</h2>
+<!-- ============================================ -->
+
+<div class="flow-section">
+  <h3>/audit/pack → Generates a shareable link for the auditor</h3>
+  
+  <div class="screen">
+    <div class="screen-header"><span>localhost:3000/audit/pack</span></div>
+    <div class="screen-body">
+      <h1 style="font-size: 20px; margin-bottom: 16px;">Audit Pack</h1>
+      <div style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px;">
+        <p style="font-size: 13px; font-weight: 500;">Verification Audit 2027</p>
+        <p style="font-size: 12px; color: #64748b;">Generated: 23 Jul 2026 • Expires: 1 Sep 2027</p>
+        <div style="display: flex; align-items: center; gap: 8px; margin: 12px 0;">
+          <div class="input-mock" style="flex: 1; font-family: monospace; font-size: 11px; color: #64748b;">https://auditready.app/portal/b80d8217-73e9-41cd...</div>
+          <div class="btn-primary" style="padding: 8px 12px;">Copy</div>
+        </div>
+        <div style="display: flex; gap: 12px; font-size: 12px;">
+          <span style="color: #1a2332; text-decoration: underline;">Preview portal →</span>
+          <span style="color: #dc2626;">Revoke</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="flow-arrow">↓ Auditor receives link</div>
+  
+  <div class="screen">
+    <div class="screen-header" style="background: #059669;"><span>AUDITOR VIEW (Read-Only)</span><span>portal/b80d8217...</span></div>
+    <div class="screen-body">
+      <div style="background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 6px; padding: 10px 16px; margin-bottom: 16px; font-size: 12px; color: #065f46;">
+        🔒 All data hosted in Australia (AWS Sydney). Encrypted at rest and in transit. This link expires 1 Sep 2027.
+      </div>
+      <p style="font-size: 12px; color: #64748b;">24Seven Plan Management • ABN: 30 805 183 581 • Registration Group: 0127 • Verification Pathway</p>
+      <div class="progress-bar" style="margin: 12px 0;">
+        <div class="progress-fill"><div class="progress-green" style="width: 75%;"></div><div class="progress-amber" style="width: 15%;"></div></div>
+      </div>
+      <p style="font-size: 12px; color: #64748b;">Auditor navigates by: Standards (per division) • Registers (incidents, improvements, workers) • Self-Assessment responses</p>
+      <div class="note">Every linked entity is clickable — incident → improvement → evidence. The auditor never hits a dead end.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================ -->
+<h2>9. Daily Operation (Post-Onboarding)</h2>
+<!-- ============================================ -->
+
+<div class="flow-section">
+  <h3>The 10-minute daily habit (planned feature)</h3>
+  
+  <div class="screen">
+    <div class="screen-header"><span>End of Day Check</span><span>Planned</span></div>
+    <div class="screen-body" style="max-width: 500px; margin: 0 auto;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <div>
+          <span style="font-size: 24px; font-weight: 700;">72<span style="font-size: 14px; color: #94a3b8;">/100</span></span>
+          <span class="badge-partial" style="margin-left: 8px;">Gaps Present</span>
+        </div>
+        <span style="font-size: 12px; color: #64748b;">Streak: 5 days ✓</span>
+      </div>
+      
+      <h3 style="font-size: 14px; margin-bottom: 12px;">Today's items:</h3>
+      
+      <div style="border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
+        <div style="padding: 12px 16px; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <div style="font-size: 13px; font-weight: 500;">Any incidents or complaints today?</div>
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <div class="btn-primary" style="padding: 4px 12px; font-size: 11px;">Yes — log it</div>
+            <div class="btn-outline" style="padding: 4px 12px; font-size: 11px;">No</div>
+          </div>
+        </div>
+        <div style="padding: 12px 16px; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <div style="font-size: 13px; font-weight: 500;">Worker screening: Assistant PM expires in 58 days</div>
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <div class="btn-primary" style="padding: 4px 12px; font-size: 11px;">Renew now</div>
+            <div class="btn-outline" style="padding: 4px 12px; font-size: 11px;">Snooze</div>
+          </div>
+        </div>
+        <div style="padding: 12px 16px; display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <div style="font-size: 13px; font-weight: 500;">Risk register needs review (last: Apr 2024)</div>
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <div class="btn-primary" style="padding: 4px 12px; font-size: 11px;">Upload updated</div>
+            <div class="btn-outline" style="padding: 4px 12px; font-size: 11px;">Mark reviewed</div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="btn-primary" style="width: 100%; text-align: center; margin-top: 20px; padding: 12px;">✓ Done for today</div>
+    </div>
+  </div>
+  
+  <div class="note">Daily tasks generated from: failing rules + expiry dates + overdue improvements + calendar items. 90% rule-based (free), 10% AI suggestions (weekly). No AI cost for daily use.</div>
+</div>
+
+<!-- ============================================ -->
+<h2>10. System Architecture</h2>
+<!-- ============================================ -->
+
+<div class="flow-section">
+  <h3>Technical stack & data flow</h3>
+  
+  <table class="table-mock">
+    <thead><tr><th>Layer</th><th>Technology</th><th>Details</th></tr></thead>
+    <tbody>
+      <tr><td>Frontend</td><td>Next.js 16 (App Router)</td><td>Tailwind 4 + shadcn/ui components</td></tr>
+      <tr><td>Backend</td><td>Next.js API Routes</td><td>Server-side, same deployment</td></tr>
+      <tr><td>Database</td><td>PostgreSQL (local → RDS)</td><td>Prisma ORM. 15 standards, 52 rules, 59 KB docs, 28 checklist items</td></tr>
+      <tr><td>AI</td><td>Vertex AI (Gemini 2.5 Flash)</td><td>Via proxy on EC2. Classification, generation, gap analysis</td></tr>
+      <tr><td>File Storage</td><td>Local (→ S3)</td><td>public/uploads/ for now. S3 ap-southeast-2 for production</td></tr>
+      <tr><td>Knowledge Base</td><td>59 NDIS documents indexed</td><td>Legislation, operations, compliance guides. AI cites by Doc ID</td></tr>
+      <tr><td>Hosting (planned)</td><td>AWS EC2 ap-southeast-2</td><td>Same instance as 24seven backend. Australian data sovereignty</td></tr>
+    </tbody>
+  </table>
+  
+  <h3 style="margin-top: 24px;">Data flow on upload:</h3>
+  <div style="font-family: monospace; font-size: 12px; background: #f8fafc; padding: 16px; border-radius: 8px; line-height: 2;">
+    User drops file → POST /api/evidence (saves file + DB record) → returns immediately<br>
+    &nbsp;&nbsp;↓ background (3-5s)<br>
+    classifyAndLink() → AI reads title+category → maps to standards → upserts EvidenceStandardLink<br>
+    &nbsp;&nbsp;↓<br>
+    evaluateChecklist() → AI determines which 28 checklist items this doc satisfies → upserts ChecklistStatus<br>
+    &nbsp;&nbsp;↓<br>
+    evaluateAllRules() → rule engine checks all 52 rules against current evidence state → updates isPassing<br>
+    &nbsp;&nbsp;↓<br>
+    Next page load shows updated: checklist ticks, standards status, rules score
+  </div>
+</div>
+
+<!-- ============================================ -->
+<h2>Build Status</h2>
+<!-- ============================================ -->
+
+<div class="flow-section">
+  <table class="table-mock">
+    <thead><tr><th>Feature</th><th>Status</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>Onboarding (4-step, old)</td><td><span class="badge-met">Built</span></td><td>Being replaced by 2-screen flow</td></tr>
+      <tr><td>Onboarding (2-screen, smart)</td><td><span class="badge-partial">Spec ready</span></td><td>BUILD-ONBOARDING-V2.md</td></tr>
+      <tr><td>Checklist (28 items)</td><td><span class="badge-met">Built</span></td><td>One-upload-satisfies-many working</td></tr>
+      <tr><td>Documents CRUD</td><td><span class="badge-met">Built</span></td><td>View, download, re-evaluate, delete</td></tr>
+      <tr><td>Standards (15)</td><td><span class="badge-met">Built</span></td><td>Compliance bar, grouped by division</td></tr>
+      <tr><td>Rules engine (52)</td><td><span class="badge-met">Built</span></td><td>Weighted scoring, auto-evaluate on upload</td></tr>
+      <tr><td>AI auto-classify</td><td><span class="badge-met">Built</span></td><td>Server-side background, 3-5s</td></tr>
+      <tr><td>AI self-assessment</td><td><span class="badge-met">Built</span></td><td>Real Gemini, ~300 words per standard</td></tr>
+      <tr><td>AI generate document</td><td><span class="badge-met">Built</span></td><td>Markdown templates for missing items</td></tr>
+      <tr><td>Workers tracker</td><td><span class="badge-met">Built</span></td><td>Screening, training, supervision</td></tr>
+      <tr><td>Incidents register</td><td><span class="badge-met">Built</span></td><td>CRUD, linked to improvements</td></tr>
+      <tr><td>Improvements register</td><td><span class="badge-met">Built</span></td><td>Traceability back to incidents</td></tr>
+      <tr><td>Audit Pack + Portal</td><td><span class="badge-met">Built</span></td><td>Token URL, security banner, read-only</td></tr>
+      <tr><td>Knowledge Base (59 docs)</td><td><span class="badge-met">Built</span></td><td>Ingested from PM_AI_Knowledge_Base</td></tr>
+      <tr><td>Evidence state machine</td><td><span class="badge-met">Built</span></td><td>VERIFIED + expiry scan (90/60/30)</td></tr>
+      <tr><td>Fix document AI flow</td><td><span class="badge-gap">Not built</span></td><td>AI identifies issues + generates corrected DOCX</td></tr>
+      <tr><td>Daily End of Day Check</td><td><span class="badge-gap">Not built</span></td><td>10-min habit, rule-generated tasks</td></tr>
+      <tr><td>Deploy to EC2</td><td><span class="badge-gap">Not built</span></td><td>30 min when ready</td></tr>
+    </tbody>
+  </table>
+</div>
+
+</div>
+</body>
+</html>

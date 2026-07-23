@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AuditReady — User Journey Flowchart</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Inter', -apple-system, sans-serif; background: #1a2332; color: #fff; padding: 40px; min-height: 100vh; }
+h1 { font-size: 24px; font-weight: 700; text-align: center; margin-bottom: 8px; }
+.subtitle { text-align: center; color: #94a3b8; font-size: 13px; margin-bottom: 48px; }
+
+/* Flow container */
+.flow { display: flex; flex-direction: column; align-items: center; max-width: 1200px; margin: 0 auto; }
+
+/* Nodes */
+.node { background: #fff; color: #1a2332; border-radius: 10px; padding: 16px 24px; text-align: center; position: relative; box-shadow: 0 4px 24px rgba(0,0,0,0.3); }
+.node h3 { font-size: 14px; font-weight: 700; margin-bottom: 4px; }
+.node p { font-size: 11px; color: #64748b; margin: 0; }
+.node.start { background: #059669; color: #fff; }
+.node.start p { color: rgba(255,255,255,0.8); }
+.node.decision { background: #fbbf24; color: #1a2332; transform: rotate(0deg); border-radius: 8px; border: 3px solid #f59e0b; }
+.node.action { background: #fff; border: 2px solid #e2e8f0; }
+.node.ai { background: #ede9fe; border: 2px solid #a78bfa; }
+.node.ai p { color: #6d28d9; }
+.node.output { background: #ecfdf5; border: 2px solid #6ee7b7; }
+.node.planned { background: #f1f5f9; border: 2px dashed #94a3b8; }
+.node.planned h3 { color: #64748b; }
+
+/* Connectors */
+.arrow { width: 2px; height: 32px; background: #475569; margin: 0 auto; position: relative; }
+.arrow::after { content: '▼'; position: absolute; bottom: -8px; left: -5px; color: #475569; font-size: 10px; }
+.arrow-label { font-size: 10px; color: #94a3b8; text-align: center; margin: -4px 0 -4px; padding: 2px 8px; }
+
+/* Branch containers */
+.branch { display: flex; gap: 24px; align-items: flex-start; justify-content: center; position: relative; margin: 8px 0; }
+.branch::before { content: ''; position: absolute; top: 0; left: 25%; right: 25%; height: 2px; background: #475569; }
+.branch-item { display: flex; flex-direction: column; align-items: center; }
+.branch-connector { width: 2px; height: 20px; background: #475569; }
+
+/* Horizontal sections */
+.section { margin: 48px 0; width: 100%; }
+.section-title { color: #94a3b8; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; font-weight: 600; margin-bottom: 16px; text-align: center; }
+
+/* Side by side */
+.parallel { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; width: 100%; max-width: 900px; }
+.parallel-col { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+
+/* Legend */
+.legend { display: flex; gap: 24px; justify-content: center; margin: 32px 0; flex-wrap: wrap; }
+.legend-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #94a3b8; }
+.legend-dot { width: 12px; height: 12px; border-radius: 3px; }
+
+/* Swimlane */
+.swimlane { border: 1px solid #334155; border-radius: 12px; padding: 24px; margin: 16px 0; width: 100%; max-width: 900px; }
+.swimlane-title { font-size: 12px; font-weight: 600; color: #64748b; margin-bottom: 16px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+/* Loop indicator */
+.loop { border: 2px dashed #475569; border-radius: 12px; padding: 20px; margin: 16px 0; position: relative; }
+.loop-label { position: absolute; top: -10px; left: 20px; background: #1a2332; padding: 0 8px; font-size: 10px; color: #94a3b8; }
+</style>
+</head>
+<body>
+
+<h1>AuditReady — User Journey Flowchart</h1>
+<p class="subtitle">Complete application workflow from first visit to audit-ready state</p>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background: #059669;"></div> Start/End</div>
+  <div class="legend-item"><div class="legend-dot" style="background: #fbbf24;"></div> Decision</div>
+  <div class="legend-item"><div class="legend-dot" style="background: #fff; border: 2px solid #e2e8f0;"></div> User Action</div>
+  <div class="legend-item"><div class="legend-dot" style="background: #ede9fe; border: 2px solid #a78bfa;"></div> AI Processing</div>
+  <div class="legend-item"><div class="legend-dot" style="background: #ecfdf5; border: 2px solid #6ee7b7;"></div> Output/Result</div>
+  <div class="legend-item"><div class="legend-dot" style="background: #f1f5f9; border: 2px dashed #94a3b8;"></div> Planned Feature</div>
+</div>
+
+<div class="flow">
+
+<!-- ===== ENTRY ===== -->
+<div class="node start">
+  <h3>User opens AuditReady</h3>
+  <p>localhost:3000 (local) or auditready.app (production)</p>
+</div>
+
+<div class="arrow"></div>
+
+<div class="node decision">
+  <h3>First time? (0 evidence in DB)</h3>
+  <p>Check: evidence count = 0 AND no localStorage flag</p>
+</div>
+
+<div style="display: flex; gap: 120px; margin-top: 8px;">
+  <div style="display: flex; flex-direction: column; align-items: center;">
+    <div class="arrow-label">YES → Onboarding</div>
+    <div class="arrow" style="height: 20px;"></div>
+    <div class="node action" style="max-width: 280px;">
+      <h3>Screen 1: Input</h3>
+      <p>• How many participants?<br>• How many staff?<br>• Upload ALL compliance docs (multi-file)</p>
+    </div>
+    <div class="arrow"></div>
+    <div class="node ai" style="max-width: 280px;">
+      <h3>AI: Process uploads</h3>
+      <p>• Classify each doc (title + category)<br>• Map to standards<br>• Map to 28 checklist items<br>• Detect scenario (A/B/C)</p>
+    </div>
+    <div class="arrow"></div>
+    <div class="node output" style="max-width: 280px;">
+      <h3>Screen 2: Results</h3>
+      <p>• Scenario detected (pre-audit / renewal / mid-cycle)<br>• Delta shown (what's changed)<br>• Checklist progress: X/28<br>• Priority actions listed</p>
+    </div>
+    <div class="arrow"></div>
+    <div class="arrow-label">→ Redirect to Checklist</div>
+  </div>
+  
+  <div style="display: flex; flex-direction: column; align-items: center;">
+    <div class="arrow-label">NO → Dashboard</div>
+    <div class="arrow" style="height: 20px;"></div>
+    <div class="node action" style="max-width: 280px;">
+      <h3>Dashboard</h3>
+      <p>• Compliance score<br>• Days until audit<br>• Active alerts<br>• Quick links</p>
+    </div>
+    <div class="arrow" style="height: 60px;"></div>
+    <div class="arrow-label">↓ Daily use</div>
+  </div>
+</div>
+
+<!-- ===== MAIN APP LOOP ===== -->
+<div class="section">
+  <div class="section-title">─── Main Application (ongoing use) ───</div>
+</div>
+
+<div class="swimlane">
+  <div class="swimlane-title">Core Loop: Upload → Analyse → Score → Fix</div>
+  
+  <div style="display: flex; flex-direction: column; align-items: center;">
+    <div class="node action">
+      <h3>User uploads a document</h3>
+      <p>From Checklist page or Documents page. Any file type.</p>
+    </div>
+    <div class="arrow"></div>
+    <div class="node ai">
+      <h3>AI: Auto-classify (background, 3-5s)</h3>
+      <p>Title + category → maps to standards + checklist items</p>
+    </div>
+    <div class="arrow"></div>
+    
+    <div style="display: flex; gap: 24px; align-items: flex-start;">
+      <div style="display: flex; flex-direction: column; align-items: center;">
+        <div class="node output" style="max-width: 200px;">
+          <h3>Standards linked</h3>
+          <p>VM-1.1, VM-1.2, etc.</p>
+        </div>
+      </div>
+      <div style="display: flex; flex-direction: column; align-items: center;">
+        <div class="node output" style="max-width: 200px;">
+          <h3>Checklist items ticked</h3>
+          <p>GOV-POLICY ✓, REG-RISK ✓</p>
+        </div>
+      </div>
+      <div style="display: flex; flex-direction: column; align-items: center;">
+        <div class="node output" style="max-width: 200px;">
+          <h3>Rules re-evaluated</h3>
+          <p>Score: 42 → 67 (+25)</p>
+        </div>
+      </div>
+    </div>
+    
+    <div class="arrow" style="height: 20px;"></div>
+    
+    <div class="node decision">
+      <h3>Score ≥ 90?</h3>
+      <p>90-100 = Audit-Ready 🟢</p>
+    </div>
+    
+    <div style="display: flex; gap: 80px; margin-top: 8px;">
+      <div style="display: flex; flex-direction: column; align-items: center;">
+        <div class="arrow-label">NO</div>
+        <div class="arrow" style="height: 16px;"></div>
+        <div class="node action" style="max-width: 250px;">
+          <h3>Review gaps</h3>
+          <p>Checklist shows remaining items<br>Rules show CRITICAL failures<br>Standards show what's needed</p>
+        </div>
+        <div class="arrow"></div>
+        <div class="arrow-label">↑ Upload more evidence (loop)</div>
+      </div>
+      <div style="display: flex; flex-direction: column; align-items: center;">
+        <div class="arrow-label">YES</div>
+        <div class="arrow" style="height: 16px;"></div>
+        <div class="node start" style="max-width: 250px;">
+          <h3>Generate Audit Pack</h3>
+          <p>Create shareable portal link<br>Share with auditor</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== PAGES / VIEWS ===== -->
+<div class="section">
+  <div class="section-title">─── Available Views (accessible from sidebar) ───</div>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; max-width: 900px; width: 100%;">
+  <div class="node action" style="padding: 12px;">
+    <h3 style="font-size: 12px;">Checklist</h3>
+    <p>28 auditor items<br>Upload satisfies many<br>[Generate] for missing</p>
+  </div>
+  <div class="node action" style="padding: 12px;">
+    <h3 style="font-size: 12px;">Documents</h3>
+    <p>All uploads<br>View/Edit/Delete<br>See what each covers</p>
+  </div>
+  <div class="node action" style="padding: 12px;">
+    <h3 style="font-size: 12px;">Standards</h3>
+    <p>15 Practice Standards<br>Met/Partial/Gap<br>Self-assessment per std</p>
+  </div>
+  <div class="node action" style="padding: 12px;">
+    <h3 style="font-size: 12px;">Rules</h3>
+    <p>52 weighted rules<br>Score 0-100<br>CRITICAL/MAJOR/MINOR</p>
+  </div>
+  <div class="node action" style="padding: 12px;">
+    <h3 style="font-size: 12px;">Workers</h3>
+    <p>Staff compliance<br>Screening expiry<br>Training records</p>
+  </div>
+  <div class="node action" style="padding: 12px;">
+    <h3 style="font-size: 12px;">Incidents</h3>
+    <p>Log complaints<br>Investigation trail<br>→ Links to improvements</p>
+  </div>
+  <div class="node action" style="padding: 12px;">
+    <h3 style="font-size: 12px;">Improvements</h3>
+    <p>Continuous register<br>Source traceability<br>Corrective actions</p>
+  </div>
+  <div class="node action" style="padding: 12px;">
+    <h3 style="font-size: 12px;">Audit Pack</h3>
+    <p>Generate portal link<br>Share with auditor<br>Read-only view</p>
+  </div>
+</div>
+
+<!-- ===== AUDIT READY PATH ===== -->
+<div class="section">
+  <div class="section-title">─── Audit Day Path ───</div>
+</div>
+
+<div style="display: flex; flex-direction: column; align-items: center;">
+  <div class="node start">
+    <h3>Score ≥ 90 → Audit-Ready 🟢</h3>
+    <p>All CRITICAL rules passing. Checklist substantially complete.</p>
+  </div>
+  <div class="arrow"></div>
+  <div class="node action">
+    <h3>Generate Self-Assessment (AI)</h3>
+    <p>~300 words per standard, citing uploaded evidence</p>
+  </div>
+  <div class="arrow"></div>
+  <div class="node action">
+    <h3>Generate Audit Pack</h3>
+    <p>Creates token URL → shareable portal</p>
+  </div>
+  <div class="arrow"></div>
+  <div class="node output">
+    <h3>Share portal link with auditor</h3>
+    <p>Read-only. Security banner. Navigate by standard.</p>
+  </div>
+  <div class="arrow"></div>
+  <div class="node action">
+    <h3>Auditor reviews (desktop review)</h3>
+    <p>Reads self-assessment → views evidence → checks registers</p>
+  </div>
+  <div class="arrow"></div>
+  <div class="node decision">
+    <h3>Auditor satisfied?</h3>
+  </div>
+  <div style="display: flex; gap: 80px; margin-top: 8px;">
+    <div style="display: flex; flex-direction: column; align-items: center;">
+      <div class="arrow-label">YES</div>
+      <div class="arrow" style="height: 16px;"></div>
+      <div class="node start">
+        <h3>✓ Audit Passed</h3>
+        <p>Report submitted to Commission within 14 days</p>
+      </div>
+    </div>
+    <div style="display: flex; flex-direction: column; align-items: center;">
+      <div class="arrow-label">QUESTIONS</div>
+      <div class="arrow" style="height: 16px;"></div>
+      <div class="node action" style="max-width: 250px;">
+        <h3>Address queries</h3>
+        <p>Upload additional evidence<br>Update documents<br>Re-share portal</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== DAILY MAINTENANCE ===== -->
+<div class="section">
+  <div class="section-title">─── Daily Maintenance (post-onboarding, planned) ───</div>
+</div>
+
+<div class="loop">
+  <div class="loop-label">DAILY LOOP (10 minutes)</div>
+  <div style="display: flex; flex-direction: column; align-items: center;">
+    <div class="node planned">
+      <h3>End of Day Check</h3>
+      <p>PM opens tool after finishing claims/payments</p>
+    </div>
+    <div class="arrow"></div>
+    <div class="node planned">
+      <h3>System shows today's items (2-4 items)</h3>
+      <p>Generated from: failing rules + expiry dates + overdue actions + calendar</p>
+    </div>
+    <div class="arrow"></div>
+    <div style="display: flex; gap: 16px;">
+      <div class="node planned" style="max-width: 180px; padding: 10px;">
+        <h3 style="font-size: 11px;">Any incidents?</h3>
+        <p>Yes → log it<br>No → confirm</p>
+      </div>
+      <div class="node planned" style="max-width: 180px; padding: 10px;">
+        <h3 style="font-size: 11px;">Expiry alert</h3>
+        <p>Renew now<br>or Snooze 7d</p>
+      </div>
+      <div class="node planned" style="max-width: 180px; padding: 10px;">
+        <h3 style="font-size: 11px;">Doc review due</h3>
+        <p>Upload updated<br>or Mark reviewed</p>
+      </div>
+    </div>
+    <div class="arrow"></div>
+    <div class="node planned">
+      <h3>✓ Done for today</h3>
+      <p>Score maintained. Streak continues. Come back tomorrow.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ===== AI DATA FLOW ===== -->
+<div class="section">
+  <div class="section-title">─── AI Processing Pipeline (what happens on every upload) ───</div>
+</div>
+
+<div style="display: flex; flex-direction: column; align-items: center; max-width: 600px; margin: 0 auto;">
+  <div class="node action">
+    <h3>File uploaded by user</h3>
+    <p>Saved to storage + DB record created → response returned immediately</p>
+  </div>
+  <div class="arrow"></div>
+  <div class="arrow-label" style="color: #a78bfa;">↓ Background (non-blocking)</div>
+  <div class="arrow" style="height: 16px;"></div>
+  <div class="node ai">
+    <h3>1. classifyAndLink()</h3>
+    <p>AI prompt: "Given title + category, which standards does this satisfy?"<br>→ Creates EvidenceStandardLink rows</p>
+  </div>
+  <div class="arrow"></div>
+  <div class="node ai">
+    <h3>2. evaluateChecklist()</h3>
+    <p>AI prompt: "Which of these 28 auditor items does this doc satisfy?"<br>→ Upserts ChecklistStatus rows</p>
+  </div>
+  <div class="arrow"></div>
+  <div class="node ai" style="background: #f5f3ff; border-color: #7c3aed;">
+    <h3>3. evaluateAllRules()</h3>
+    <p>Rule engine (no AI): checks 52 rules against current DB state<br>→ Updates isPassing + calculates weighted score</p>
+  </div>
+  <div class="arrow"></div>
+  <div class="node output">
+    <h3>Next page load reflects changes</h3>
+    <p>Checklist ticks updated • Standards status updated • Score recalculated</p>
+  </div>
+</div>
+
+<div style="text-align: center; margin-top: 64px; padding: 32px; color: #64748b; font-size: 12px;">
+  <p>AuditReady v1.0 — NDIS Plan Management Verification Audit Readiness Tool</p>
+  <p>Built: 22-24 July 2026 | First customer: 24Seven Plan Management</p>
+</div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,353 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Organisation {
+  id                 String       @id @default(uuid())
+  name               String
+  abn                String?
+  registrationGroups Json         @default("[]")
+  registrationExpiry DateTime
+  auditPathway       AuditPathway
+  participantCount   Int?
+  staffCount         Int?
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+}
+
+model Standard {
+  id                     String                 @id @default(uuid())
+  code                   String                 @unique
+  name                   String
+  module                 String
+  division               String
+  description            String
+  qualityIndicators      Json                   @default("[]")
+  evidenceGuidance       String
+  order                  Int
+  createdAt              DateTime               @default(now())
+  commonGaps             Json                   @default("[]")
+  goldStandard           String                 @default("")
+  planManagementSpecific Json                   @default("[]")
+  evidenceLinks          EvidenceStandardLink[]
+  selfAssessment         SelfAssessment?
+}
+
+model Evidence {
+  id                  String                   @id @default(uuid())
+  title               String
+  description         String?
+  fileUrl             String
+  fileName            String
+  fileType            String
+  fileSize            Int
+  category            EvidenceCategory
+  status              EvidenceStatus
+  version             String?
+  expiryDate          DateTime?
+  uploadedAt          DateTime                 @default(now())
+  verifiedAt          DateTime?
+  verifiedBy          String?
+  notes               String?
+  createdAt           DateTime                 @default(now())
+  updatedAt           DateTime                 @updatedAt
+  standardLinks       EvidenceStandardLink[]
+  improvements        Improvement[]
+  correctiveIncidents Incident[]               @relation("CorrectiveEvidence")
+  selfAssessmentLinks SelfAssessmentEvidence[]
+  workerOrientation   Worker[]                 @relation("OrientationEvidence")
+  workerSupervisions  WorkerSupervision[]
+  workerTrainings     WorkerTraining[]
+}
+
+model EvidenceStandardLink {
+  id              String   @id @default(uuid())
+  evidenceId      String
+  standardId      String
+  confidence      Float?
+  confirmedByUser Boolean  @default(false)
+  notes           String?
+  createdAt       DateTime @default(now())
+  evidence        Evidence @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+  standard        Standard @relation(fields: [standardId], references: [id], onDelete: Cascade)
+
+  @@unique([evidenceId, standardId])
+}
+
+model Worker {
+  id                    String              @id @default(uuid())
+  name                  String
+  role                  String
+  email                 String?
+  screeningCheckNumber  String?
+  screeningExpiry       DateTime?
+  screeningStatus       ScreeningStatus     @default(PENDING)
+  orientationDate       DateTime?
+  orientationEvidenceId String?
+  policeCheckExpiry     DateTime?
+  wwccExpiry            DateTime?
+  isActive              Boolean             @default(true)
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  orientationEvidence   Evidence?           @relation("OrientationEvidence", fields: [orientationEvidenceId], references: [id])
+  supervisions          WorkerSupervision[]
+  trainings             WorkerTraining[]
+}
+
+model WorkerTraining {
+  id            String    @id @default(uuid())
+  workerId      String
+  title         String
+  completedDate DateTime
+  expiryDate    DateTime?
+  evidenceId    String?
+  notes         String?
+  createdAt     DateTime  @default(now())
+  evidence      Evidence? @relation(fields: [evidenceId], references: [id])
+  worker        Worker    @relation(fields: [workerId], references: [id], onDelete: Cascade)
+}
+
+model WorkerSupervision {
+  id             String    @id @default(uuid())
+  workerId       String
+  date           DateTime
+  supervisorName String
+  notes          String
+  evidenceId     String?
+  createdAt      DateTime  @default(now())
+  evidence       Evidence? @relation(fields: [evidenceId], references: [id])
+  worker         Worker    @relation(fields: [workerId], references: [id], onDelete: Cascade)
+}
+
+model Incident {
+  id                         String         @id @default(uuid())
+  type                       IncidentType
+  title                      String
+  description                String
+  dateOccurred               DateTime
+  dateReported               DateTime       @default(now())
+  reportedBy                 String
+  severity                   Severity
+  isReportable               Boolean        @default(false)
+  commissionNotified         Boolean        @default(false)
+  commissionNotificationDate DateTime?
+  investigationNotes         String?
+  rootCause                  String?
+  correctiveAction           String?
+  correctiveActionEvidenceId String?
+  status                     IncidentStatus @default(OPEN)
+  resolvedDate               DateTime?
+  linkedImprovementId        String?
+  createdAt                  DateTime       @default(now())
+  updatedAt                  DateTime       @updatedAt
+  correctiveActionEvidence   Evidence?      @relation("CorrectiveEvidence", fields: [correctiveActionEvidenceId], references: [id])
+  linkedImprovement          Improvement?   @relation(fields: [linkedImprovementId], references: [id])
+}
+
+model Improvement {
+  id                String            @id @default(uuid())
+  title             String
+  description       String
+  source            ImprovementSource
+  sourceId          String?
+  identifiedDate    DateTime          @default(now())
+  actionRequired    String
+  actionTaken       String?
+  evidenceId        String?
+  responsiblePerson String
+  dueDate           DateTime
+  completedDate     DateTime?
+  status            ImprovementStatus @default(IDENTIFIED)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  evidence          Evidence?         @relation(fields: [evidenceId], references: [id])
+  incidents         Incident[]
+}
+
+model SelfAssessment {
+  id            String                   @id @default(uuid())
+  standardId    String                   @unique
+  responseText  String
+  status        SelfAssessmentStatus     @default(DRAFT)
+  generatedAt   DateTime?
+  reviewedAt    DateTime?
+  createdAt     DateTime                 @default(now())
+  updatedAt     DateTime                 @updatedAt
+  standard      Standard                 @relation(fields: [standardId], references: [id], onDelete: Cascade)
+  evidenceLinks SelfAssessmentEvidence[]
+}
+
+model SelfAssessmentEvidence {
+  id               String         @id @default(uuid())
+  selfAssessmentId String
+  evidenceId       String
+  createdAt        DateTime       @default(now())
+  evidence         Evidence       @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+  selfAssessment   SelfAssessment @relation(fields: [selfAssessmentId], references: [id], onDelete: Cascade)
+
+  @@unique([selfAssessmentId, evidenceId])
+}
+
+model AuditPack {
+  id                String   @id @default(uuid())
+  name              String
+  token             String   @unique
+  expiresAt         DateTime
+  generatedAt       DateTime @default(now())
+  standardsSnapshot Json     @default("{}")
+  notes             String?
+  createdAt         DateTime @default(now())
+}
+
+model Alert {
+  id             String        @id @default(uuid())
+  type           AlertType
+  entityType     String
+  entityId       String
+  title          String
+  message        String
+  severity       AlertSeverity
+  dueDate        DateTime?
+  acknowledged   Boolean       @default(false)
+  acknowledgedAt DateTime?
+  createdAt      DateTime      @default(now())
+}
+
+model KBDocument {
+  id          String   @id @default(uuid())
+  docId       String   @unique
+  name        String
+  filePath    String
+  summary     String
+  sourceUrl   String?
+  lastUpdated String?
+  reviewDate  String?
+  fileStatus  String
+  category    String
+  createdAt   DateTime @default(now())
+}
+
+model Rule {
+  id                  String   @id @default(uuid())
+  code                String   @unique
+  domain              String
+  displayName         String
+  description         String
+  officialRef         String
+  qualityIndicatorRef String?
+  severity            String
+  weight              Int
+  condition           String
+  evidenceRequired    String
+  remediation         String
+  appliesTo           String[] @default(["PM"])
+  auditPathway        String   @default("BOTH")
+  trigger             String   @default("daily_scan")
+  isPassing           Boolean  @default(false)
+  createdAt           DateTime @default(now())
+}
+
+model ChecklistStatus {
+  id            String   @id @default(uuid())
+  checklistId   String   @unique
+  satisfied     Boolean  @default(false)
+  evidenceId    String?
+  satisfiedFrom String?
+  updatedAt     DateTime @updatedAt
+}
+
+enum AuditPathway {
+  VERIFICATION
+  CERTIFICATION
+}
+
+enum EvidenceCategory {
+  POLICY
+  PARTICIPANT
+  WORKER
+  INCIDENT
+  SERVICE_DELIVERY
+  GOVERNANCE
+  OTHER
+}
+
+enum EvidenceStatus {
+  MISSING
+  UPLOADED
+  UNDER_REVIEW
+  VERIFIED
+  EXPIRING
+  EXPIRED
+  CURRENT
+  OUTDATED
+  DRAFT
+}
+
+enum ScreeningStatus {
+  CURRENT
+  EXPIRING
+  EXPIRED
+  PENDING
+}
+
+enum IncidentType {
+  INCIDENT
+  COMPLAINT
+  NEAR_MISS
+  FEEDBACK
+}
+
+enum Severity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum IncidentStatus {
+  OPEN
+  INVESTIGATING
+  RESOLVED
+  CLOSED
+}
+
+enum ImprovementSource {
+  INCIDENT
+  COMPLAINT
+  FEEDBACK
+  AUDIT
+  INTERNAL_REVIEW
+  RISK_ASSESSMENT
+}
+
+enum ImprovementStatus {
+  IDENTIFIED
+  IN_PROGRESS
+  COMPLETED
+  VERIFIED
+}
+
+enum SelfAssessmentStatus {
+  DRAFT
+  REVIEWED
+  FINAL
+}
+
+enum AlertType {
+  EXPIRY
+  GAP
+  OVERDUE
+  IMPROVEMENT_DUE
+  REVIEW_DUE
+}
+
+enum AlertSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
