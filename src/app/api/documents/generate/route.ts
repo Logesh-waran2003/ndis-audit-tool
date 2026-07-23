@@ -2,107 +2,116 @@ import { NextRequest, NextResponse } from 'next/server'
 import { generateText } from '@/lib/ai'
 import { Document, Packer, Paragraph, TextRun, HeadingLevel } from 'docx'
 
-export const dynamic = 'force-dynamic'
-
-interface DocSection {
-  heading: string
-  content: string
-}
-
 export async function POST(request: NextRequest) {
   try {
-    const { checklistId, itemName, context } = await request.json()
+    const { checklistId, itemName, context, ruleCode, issue } = await request.json()
 
-    if (!itemName) {
-      return NextResponse.json({ error: 'itemName is required' }, { status: 400 })
-    }
+    const docName = itemName || ruleCode || 'Compliance Document'
 
-    const prompt = `Generate a complete "${itemName}" document for an NDIS Plan Management provider called "24 Seven Plan Management".
+    const prompt = `Generate a complete "${docName}" document for an NDIS Plan Management provider.
 
-Context: This provider manages 1100+ participants, has 3 staff, is registered under group 0127 (Plan Management), and is preparing for a verification audit.
+Provider: 24 Seven Plan Management
+Participants: 1100+
+Staff: 3 (Plan Manager, Assistant Plan Manager, Community Relations Manager)
+Registration group: 0127 (Plan Management)
+Audit pathway: Verification
 
-${context || ''}
+${context ? `Additional context: ${context}` : ''}
+${issue ? `Issue to address: ${issue}` : ''}
 
-Format the response as JSON with this structure:
+Create a professional, audit-ready document. Return as JSON:
 {
   "title": "Document Title",
+  "subtitle": "24 Seven Plan Management",
+  "version": "1.0",
+  "date": "${new Date().toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' })}",
   "sections": [
-    { "heading": "Section Name", "content": "Full paragraph text..." },
-    { "heading": "Section 2", "content": "..." }
+    {
+      "heading": "Section Title",
+      "paragraphs": ["Paragraph 1 text...", "Paragraph 2 text..."]
+    }
   ]
 }
 
-Make it professional, compliant with NDIS Practice Standards, and ready to use with minimal editing. Include specific details relevant to Plan Management (financial administration, invoice processing, monthly statements, etc.). Use Australian English.`
+Requirements:
+- Professional language suitable for an NDIS auditor
+- Reference relevant legislation (NDIS Act 2013, Privacy Act 1988, etc.)
+- Include specific details for Plan Management (financial administration, invoice processing, monthly statements)
+- Minimum 4-5 sections with substantive content
+- Each section should have 2-4 paragraphs
+- Be specific, not generic — reference the actual services (budget management, claims processing, provider payments)`
 
     const result = await generateText(prompt, undefined, { temperature: 0.3, maxOutputTokens: 4096 })
 
-    // Parse AI response
-    let docContent: { title: string; sections: DocSection[] } = { title: itemName, sections: [] }
-    if (!result.isMock) {
-      try {
-        const cleaned = result.text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
-        docContent = JSON.parse(cleaned)
-      } catch {
-        // Fallback: use raw text as single section
-        docContent = { title: itemName, sections: [{ heading: 'Content', content: result.text }] }
-      }
-    } else {
-      docContent = {
-        title: itemName,
-        sections: [
-          { heading: 'Purpose', content: `This document provides the ${itemName} for 24 Seven Plan Management as required for NDIS verification audit compliance.` },
-          { heading: 'Scope', content: 'This document applies to all operations of 24 Seven Plan Management.' },
-          { heading: 'Content', content: '[AI was unavailable — add your content here to satisfy this audit requirement.]' },
-          { heading: 'Review', content: 'This document will be reviewed annually or when significant changes occur.' },
-        ],
-      }
+    if (result.isMock) {
+      return NextResponse.json({ error: 'AI unavailable' }, { status: 503 })
     }
 
-    // Build DOCX
+    let docContent: { title: string; subtitle?: string; version?: string; date?: string; sections: Array<{ heading: string; paragraphs: string[] }> }
+    try {
+      let cleaned = result.text.trim()
+      if (cleaned.startsWith('```')) cleaned = cleaned.substring(cleaned.indexOf('\n') + 1)
+      if (cleaned.endsWith('```')) cleaned = cleaned.substring(0, cleaned.lastIndexOf('```'))
+      docContent = JSON.parse(cleaned.trim())
+    } catch {
+      return NextResponse.json({ error: 'Failed to generate document content' }, { status: 500 })
+    }
+
     const doc = new Document({
       sections: [{
         properties: {},
         children: [
           new Paragraph({
-            text: docContent.title,
-            heading: HeadingLevel.TITLE,
-            spacing: { after: 200 },
+            children: [new TextRun({ text: docContent.title, bold: true, size: 48, font: 'Calibri' })],
+            spacing: { after: 100 },
           }),
           new Paragraph({
             children: [
-              new TextRun({ text: '24 Seven Plan Management', italics: true, size: 20, color: '666666' }),
-              new TextRun({ text: `  |  Generated: ${new Date().toLocaleDateString('en-AU')}`, italics: true, size: 20, color: '666666' }),
+              new TextRun({ text: docContent.subtitle || '24 Seven Plan Management', italics: true, size: 24, color: '666666' }),
+            ],
+            spacing: { after: 50 },
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: `Version ${docContent.version || '1.0'} | ${docContent.date || new Date().toLocaleDateString('en-AU')}`, size: 20, color: '999999' }),
             ],
             spacing: { after: 400 },
           }),
-          ...docContent.sections.flatMap((section: DocSection) => [
+          ...docContent.sections.flatMap(section => [
             new Paragraph({
-              text: section.heading,
+              children: [new TextRun({ text: section.heading, bold: true, size: 28, font: 'Calibri' })],
               heading: HeadingLevel.HEADING_1,
-              spacing: { before: 300, after: 100 },
+              spacing: { before: 300, after: 120 },
             }),
-            ...section.content.split('\n').filter(Boolean).map(para =>
+            ...section.paragraphs.map(para =>
               new Paragraph({
-                text: para,
+                children: [new TextRun({ text: para, size: 22, font: 'Calibri' })],
                 spacing: { after: 120 },
               })
             ),
           ]),
+          new Paragraph({ spacing: { before: 600 } }),
+          new Paragraph({
+            children: [new TextRun({ text: '— End of Document —', italics: true, size: 18, color: '999999' })],
+          }),
+          new Paragraph({
+            children: [new TextRun({ text: `Generated by AuditReady | ${new Date().toLocaleDateString('en-AU')}`, size: 16, color: 'BBBBBB' })],
+          }),
         ],
       }],
     })
 
     const buffer = await Packer.toBuffer(doc)
-    const filename = itemName.replace(/[^a-zA-Z0-9 ]/g, '').trim()
+    const filename = `${docContent.title.replace(/[^a-zA-Z0-9 ]/g, '').replace(/\s+/g, '_')}.docx`
 
     return new NextResponse(new Uint8Array(buffer), {
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'Content-Disposition': `attachment; filename="${filename}.docx"`,
+        'Content-Disposition': `attachment; filename="${filename}"`,
       },
     })
   } catch (error) {
-    console.error('[POST /api/documents/generate]', error)
-    return NextResponse.json({ error: 'Generation failed' }, { status: 500 })
+    console.error('[documents/generate]', error)
+    return NextResponse.json({ error: 'Document generation failed' }, { status: 500 })
   }
 }

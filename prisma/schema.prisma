@@ -256,9 +256,27 @@ model ChecklistStatus {
   id            String   @id @default(uuid())
   checklistId   String   @unique
   satisfied     Boolean  @default(false)
+  confidence    String?  // VERIFIED, PARTIAL, TITLE_MATCH_ONLY
   evidenceId    String?
   satisfiedFrom String?
+  concerns      String?
   updatedAt     DateTime @updatedAt
+}
+
+model DocumentAnalysis {
+  id               String   @id @default(uuid())
+  evidenceId       String   @unique
+  documentType     String
+  extractedTitle   String
+  dates            Json     // { created, lastReviewed, expires, nextReview }
+  sections         Json     // ["Chapter 1: Governance", ...]
+  legislationRefs  Json     // ["NDIS Act 2013", "Privacy Act 1988"]
+  personnel        Json     // ["Baily Fernandez"]
+  keyFindings      Json     // ["Establishes risk management framework"]
+  concerns         Json     // ["Dated 2022, references outdated legislation"]
+  qualityScore     Int?     // 0-100
+  checklistMapping Json     // [{checklistId, confidence, evidenceQuote}]
+  analysedAt       DateTime @default(now())
 }
 
 enum AuditPathway {

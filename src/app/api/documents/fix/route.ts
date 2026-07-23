@@ -2,80 +2,76 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { generateText } from '@/lib/ai'
 import { Document, Packer, Paragraph, TextRun, HeadingLevel } from 'docx'
-
-export const dynamic = 'force-dynamic'
-
-interface DocSection {
-  heading: string
-  content: string
-}
+import { readFileSync } from 'fs'
+import { join } from 'path'
 
 export async function POST(request: NextRequest) {
   try {
-    const { evidenceId, ruleCode, issue } = await request.json()
+    const { evidenceId, issues } = await request.json()
 
-    if (!ruleCode && !issue) {
-      return NextResponse.json({ error: 'ruleCode or issue is required' }, { status: 400 })
+    if (!evidenceId) {
+      return NextResponse.json({ error: 'evidenceId required' }, { status: 400 })
     }
 
-    // Get rule details
-    let ruleInfo = ''
-    if (ruleCode) {
-      const rule = await prisma.rule.findUnique({ where: { code: ruleCode } })
-      if (rule) {
-        ruleInfo = `Rule: ${rule.code} — ${rule.displayName}\nIssue: ${rule.remediation}\nRequired evidence: ${rule.evidenceRequired}`
+    const evidence = await prisma.evidence.findUnique({ where: { id: evidenceId } })
+    if (!evidence) {
+      return NextResponse.json({ error: 'Evidence not found' }, { status: 404 })
+    }
+
+    const analysis = await prisma.documentAnalysis.findUnique({ where: { evidenceId } })
+
+    // Try to get text content for context
+    let existingContent = ''
+    try {
+      if (evidence.fileName?.endsWith('.docx')) {
+        const mammoth = await import('mammoth')
+        const buffer = readFileSync(join(process.cwd(), 'public', evidence.fileUrl || ''))
+        const result = await mammoth.extractRawText({ buffer })
+        existingContent = result.value?.substring(0, 5000) || ''
       }
-    }
+    } catch { /* ignore - will work without existing content */ }
 
-    // Get existing evidence info if provided
-    let evidenceInfo = ''
-    if (evidenceId) {
-      const evidence = await prisma.evidence.findUnique({ where: { id: evidenceId } })
-      if (evidence) {
-        evidenceInfo = `\nExisting document: "${evidence.title}" (${evidence.category})`
-      }
-    }
+    const prompt = `You need to generate a CORRECTED version of an NDIS compliance document.
 
-    const prompt = `An NDIS Plan Management provider called "24 Seven Plan Management" has a compliance issue that needs to be fixed by generating a corrected document.
+ORIGINAL DOCUMENT: "${evidence.title}"
+TYPE: ${analysis?.documentType || evidence.category}
 
-${ruleInfo}
-${evidenceInfo}
-${issue ? `\nSpecific issue: ${issue}` : ''}
+${existingContent ? `ORIGINAL CONTENT (first 5000 chars):\n${existingContent}\n` : ''}
 
-Generate a corrected/updated version of this document that addresses the identified issue. The document should:
-1. Fix the specific compliance gap identified
-2. Be professional and ready to use
-3. Follow NDIS Practice Standards requirements
-4. Use Australian English
+ISSUES TO FIX:
+${issues || ((analysis?.concerns as string[]) || []).join('\n')}
 
-Format the response as JSON:
+ADDITIONAL CONTEXT:
+- Provider: 24 Seven Plan Management (1100+ participants, 3 staff)
+- Registration group: 0127 (Plan Management)
+- Current legislation: NDIS Act 2013 (compilation May 2026), Privacy Act 1988, NDIS Practice Standards Rules 2018 (compilation July 2026)
+- Has offshore invoice processing contractor (needs data sovereignty clause)
+
+Generate the CORRECTED document. Fix all identified issues. Return JSON:
 {
-  "title": "Document Title (Corrected)",
+  "title": "Corrected document title",
   "sections": [
-    { "heading": "Section Name", "content": "Full paragraph text..." }
-  ]
+    { "heading": "Section", "paragraphs": ["text..."] }
+  ],
+  "changesApplied": ["list of what was fixed/added"]
 }
 
-Include all necessary sections to satisfy the auditor. Be specific to Plan Management (financial administration, invoice processing, monthly statements).`
+Make the document comprehensive, current, and audit-ready.`
 
     const result = await generateText(prompt, undefined, { temperature: 0.3, maxOutputTokens: 4096 })
 
-    let docContent: { title: string; sections: DocSection[] } = { title: `${ruleCode || 'Corrected Document'}`, sections: [] }
-    if (!result.isMock) {
-      try {
-        const cleaned = result.text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
-        docContent = JSON.parse(cleaned)
-      } catch {
-        docContent = { title: ruleCode || 'Corrected Document', sections: [{ heading: 'Content', content: result.text }] }
-      }
-    } else {
-      docContent = {
-        title: `${ruleCode || 'Document'} — Corrected Version`,
-        sections: [
-          { heading: 'Issue Addressed', content: issue || ruleInfo || 'Compliance gap identified during audit preparation.' },
-          { heading: 'Corrected Content', content: '[AI was unavailable — add corrected content here.]' },
-        ],
-      }
+    if (result.isMock) {
+      return NextResponse.json({ error: 'AI unavailable' }, { status: 503 })
+    }
+
+    let docContent: any
+    try {
+      let cleaned = result.text.trim()
+      if (cleaned.startsWith('```')) cleaned = cleaned.substring(cleaned.indexOf('\n') + 1)
+      if (cleaned.endsWith('```')) cleaned = cleaned.substring(0, cleaned.lastIndexOf('```'))
+      docContent = JSON.parse(cleaned.trim())
+    } catch {
+      return NextResponse.json({ error: 'Failed to generate corrected document' }, { status: 500 })
     }
 
     const doc = new Document({
@@ -83,26 +79,26 @@ Include all necessary sections to satisfy the auditor. Be specific to Plan Manag
         properties: {},
         children: [
           new Paragraph({
-            text: docContent.title,
-            heading: HeadingLevel.TITLE,
-            spacing: { after: 200 },
+            children: [new TextRun({ text: docContent.title || evidence.title, bold: true, size: 48, font: 'Calibri' })],
+            spacing: { after: 100 },
           }),
           new Paragraph({
-            children: [
-              new TextRun({ text: '24 Seven Plan Management', italics: true, size: 20, color: '666666' }),
-              new TextRun({ text: `  |  Corrected: ${new Date().toLocaleDateString('en-AU')}`, italics: true, size: 20, color: '666666' }),
-            ],
+            children: [new TextRun({ text: '24 Seven Plan Management — CORRECTED VERSION', italics: true, size: 22, color: '059669' })],
+            spacing: { after: 50 },
+          }),
+          new Paragraph({
+            children: [new TextRun({ text: `Generated: ${new Date().toLocaleDateString('en-AU')} | Changes: ${(docContent.changesApplied || []).length} corrections applied`, size: 18, color: '666666' })],
             spacing: { after: 400 },
           }),
-          ...docContent.sections.flatMap((section: DocSection) => [
+          ...(docContent.sections || []).flatMap((section: any) => [
             new Paragraph({
-              text: section.heading,
+              children: [new TextRun({ text: section.heading, bold: true, size: 28, font: 'Calibri' })],
               heading: HeadingLevel.HEADING_1,
-              spacing: { before: 300, after: 100 },
+              spacing: { before: 300, after: 120 },
             }),
-            ...section.content.split('\n').filter(Boolean).map(para =>
+            ...(section.paragraphs || []).map((para: string) =>
               new Paragraph({
-                text: para,
+                children: [new TextRun({ text: para, size: 22, font: 'Calibri' })],
                 spacing: { after: 120 },
               })
             ),
@@ -112,16 +108,17 @@ Include all necessary sections to satisfy the auditor. Be specific to Plan Manag
     })
 
     const buffer = await Packer.toBuffer(doc)
-    const filename = docContent.title.replace(/[^a-zA-Z0-9 ]/g, '').trim()
+    const filename = `CORRECTED_${evidence.title?.replace(/[^a-zA-Z0-9 ]/g, '').replace(/\s+/g, '_')}.docx`
 
     return new NextResponse(new Uint8Array(buffer), {
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'Content-Disposition': `attachment; filename="${filename}.docx"`,
+        'Content-Disposition': `attachment; filename="${filename}"`,
+        'X-Changes-Applied': JSON.stringify(docContent.changesApplied || []),
       },
     })
   } catch (error) {
-    console.error('[POST /api/documents/fix]', error)
-    return NextResponse.json({ error: 'Fix generation failed' }, { status: 500 })
+    console.error('[documents/fix]', error)
+    return NextResponse.json({ error: 'Document fix failed' }, { status: 500 })
   }
 }

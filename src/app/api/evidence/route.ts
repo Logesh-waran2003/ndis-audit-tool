@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { evaluateAllRules } from '@/lib/rule-evaluator'
 import { evaluateChecklist } from '@/lib/checklist-evaluator'
+import { analyseDocumentFull } from '@/lib/document-analyser'
 import { generateText } from '@/lib/ai'
 import { z } from 'zod'
 import { writeFile, mkdir, readFile } from 'fs/promises'
@@ -37,8 +38,8 @@ export async function GET(request: NextRequest) {
 }
 
 const createSchema = z.object({
-  title: z.string().min(1),
-  category: z.enum(['POLICY', 'PARTICIPANT', 'WORKER', 'INCIDENT', 'SERVICE_DELIVERY', 'GOVERNANCE', 'OTHER']),
+  title: z.string().optional(),
+  category: z.enum(['POLICY', 'PARTICIPANT', 'WORKER', 'INCIDENT', 'SERVICE_DELIVERY', 'GOVERNANCE', 'OTHER']).optional(),
   notes: z.string().optional(),
   expiryDate: z.string().optional(),
 })
@@ -70,10 +71,12 @@ export async function POST(request: NextRequest) {
     await writeFile(filepath, buffer)
 
     // Create evidence record
+    const title = parsed.data.title || file.name.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ')
+    const category = parsed.data.category || 'OTHER'
     const evidence = await prisma.evidence.create({
       data: {
-        title: parsed.data.title,
-        category: parsed.data.category,
+        title,
+        category,
         status: 'CURRENT',
         notes: parsed.data.notes,
         expiryDate: parsed.data.expiryDate ? new Date(parsed.data.expiryDate) : null,
@@ -84,11 +87,17 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    // Background: AI classify + auto-link + re-evaluate rules
+    // Background: AI full document analysis + classify + auto-link + re-evaluate rules
     // This runs AFTER we return the response to the user (non-blocking)
-    classifyAndLink(evidence.id, parsed.data.title, parsed.data.category, filepath).catch(err =>
-      console.error('[evidence POST] background classify failed:', err)
-    )
+    analyseDocumentFull(evidence.id).then(() => {
+      return evaluateAllRules()
+    }).catch(err => {
+      console.error('[evidence POST] full analysis failed, falling back to classifyAndLink:', err)
+      // Fallback to fast classify if full analysis fails
+      classifyAndLink(evidence.id, title, category, filepath).catch(e =>
+        console.error('[evidence POST] fallback classify also failed:', e)
+      )
+    })
 
     return NextResponse.json(evidence, { status: 201 })
   } catch (error) {

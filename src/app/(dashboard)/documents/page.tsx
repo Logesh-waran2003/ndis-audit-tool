@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { format } from 'date-fns'
-import { ChevronRight, Upload, FileUp, X, Loader2 } from 'lucide-react'
+import { ChevronRight, Upload, FileUp, X, Loader2, Download, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DatePicker } from '@/components/ui/date-picker'
 import { toast } from 'sonner'
@@ -28,6 +28,17 @@ interface ChecklistItemState {
   satisfied: boolean
   evidenceId: string | null
   satisfiedFrom: string | null
+  confidence?: string | null
+}
+
+interface DocumentAnalysis {
+  documentType: string
+  extractedTitle: string
+  sections: string[]
+  concerns: string[]
+  qualityScore: number | null
+  checklistMapping: Array<{ checklistId: string; confidence: string; evidenceQuote: string }>
+  analysedAt: string
 }
 
 const STATUS_COLOR: Record<string, string> = {
@@ -38,6 +49,11 @@ const STATUS_COLOR: Record<string, string> = {
 
 const CATEGORIES = ['POLICY', 'PARTICIPANT', 'WORKER', 'INCIDENT', 'SERVICE_DELIVERY', 'GOVERNANCE', 'OTHER'] as const
 
+function QualityBadge({ score }: { score: number }) {
+  const color = score >= 70 ? 'bg-emerald-50 text-[#059669]' : score >= 50 ? 'bg-amber-50 text-[#d97706]' : 'bg-red-50 text-[#dc2626]'
+  return <span className={`px-2 py-0.5 rounded text-xs font-medium ${color}`}>{score}/100</span>
+}
+
 export default function DocumentsPage() {
   const router = useRouter()
   const [evidence, setEvidence] = useState<Evidence[]>([])
@@ -45,14 +61,22 @@ export default function DocumentsPage() {
   const [loading, setLoading] = useState(true)
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
+  // Analysis state per document
+  const [analyses, setAnalyses] = useState<Record<string, DocumentAnalysis | null>>({})
+  const [analysisLoading, setAnalysisLoading] = useState<string | null>(null)
+
   // Edit state
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editTitle, setEditTitle] = useState('')
   const [editCategory, setEditCategory] = useState('')
   const [saving, setSaving] = useState(false)
 
-  // Re-evaluate state
+  // Re-evaluate / re-analyse state
   const [evaluatingId, setEvaluatingId] = useState<string | null>(null)
+  const [reanalysingId, setReanalysingId] = useState<string | null>(null)
+
+  // Generate fix state
+  const [generatingFix, setGeneratingFix] = useState<string | null>(null)
 
   // Upload state
   const [showUpload, setShowUpload] = useState(false)
@@ -80,6 +104,18 @@ export default function DocumentsPage() {
   }, [])
 
   useEffect(() => { fetchData() }, [fetchData])
+
+  // Fetch analysis when a row is expanded
+  useEffect(() => {
+    if (!expandedId) return
+    if (analyses[expandedId] !== undefined) return // already fetched (or null = no analysis)
+    setAnalysisLoading(expandedId)
+    fetch(`/api/evidence/${expandedId}/analysis`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => setAnalyses(prev => ({ ...prev, [expandedId]: data })))
+      .catch(() => setAnalyses(prev => ({ ...prev, [expandedId]: null })))
+      .finally(() => setAnalysisLoading(null))
+  }, [expandedId, analyses])
 
   function getChecklistItemsForEvidence(evidenceId: string) {
     return checklist.filter(i => i.satisfied && i.evidenceId === evidenceId)
@@ -157,6 +193,54 @@ export default function DocumentsPage() {
       toast.error('Evaluation failed')
     }
     setEvaluatingId(null)
+  }
+
+  // --- RE-ANALYSE (full Level 6 analysis) ---
+  async function handleReAnalyse(id: string) {
+    setReanalysingId(id)
+    try {
+      const res = await fetch(`/api/evidence/${id}/analysis`, { method: 'POST' })
+      if (res.ok) {
+        const data = await res.json()
+        setAnalyses(prev => ({ ...prev, [id]: data }))
+        toast.success('Analysis complete')
+        await fetchData()
+      } else {
+        toast.error('Analysis failed')
+      }
+    } catch {
+      toast.error('Analysis failed')
+    }
+    setReanalysingId(null)
+  }
+
+  // --- GENERATE FIX ---
+  async function handleGenerateFix(evidenceId: string, concerns: string[]) {
+    setGeneratingFix(evidenceId)
+    try {
+      const res = await fetch('/api/documents/fix', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ evidenceId, issue: concerns.join('; ') }),
+      })
+      if (res.ok) {
+        const blob = await res.blob()
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = 'Document Fix.docx'
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
+        toast.success('Fix document downloaded')
+      } else {
+        toast.error('Generation failed')
+      }
+    } catch {
+      toast.error('Generation failed')
+    }
+    setGeneratingFix(null)
   }
 
   // --- UPLOAD ---
@@ -300,6 +384,8 @@ export default function DocumentsPage() {
                 const isExpanded = expandedId === doc.id
                 const isEditing = editingId === doc.id
                 const checklistItems = getChecklistItemsForEvidence(doc.id)
+                const analysis = analyses[doc.id]
+                const isLoadingAnalysis = analysisLoading === doc.id
                 return (
                   <>
                     {/* Data row */}
@@ -332,13 +418,45 @@ export default function DocumentsPage() {
                       <tr key={`${doc.id}-detail`} className="border-b border-slate-200">
                         <td colSpan={6} className="bg-slate-50/50 px-10 py-4">
                           <div className="space-y-4">
+                            {/* Title + metadata row */}
+                            {analysis && (
+                              <div className="flex items-center gap-3 text-xs text-slate-500">
+                                <span>Type: {analysis.documentType?.replace(/_/g, ' ')}</span>
+                                {analysis.qualityScore != null && (
+                                  <span className="flex items-center gap-1">Quality: <QualityBadge score={analysis.qualityScore} /></span>
+                                )}
+                                <span>Analysed: {format(new Date(analysis.analysedAt), 'd MMM')}</span>
+                              </div>
+                            )}
+
                             {/* Action bar */}
                             <div className="flex items-center gap-3">
-                              <a href={doc.fileUrl} download={doc.fileName} className="text-sm text-slate-600 hover:text-slate-900">Download</a>
+                              <a href={doc.fileUrl} download={doc.fileName} className="text-sm font-medium text-blue-600 hover:text-blue-800 flex items-center gap-1">
+                                <Download className="h-3.5 w-3.5" />
+                                Download
+                              </a>
+                              {analysis && (analysis.concerns as string[])?.length > 0 && (
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); handleGenerateFix(doc.id, analysis.concerns as string[]) }}
+                                  disabled={generatingFix === doc.id}
+                                  className="text-sm font-medium text-blue-600 hover:text-blue-800 disabled:opacity-50 flex items-center gap-1"
+                                >
+                                  <Download className="h-3.5 w-3.5" />
+                                  {generatingFix === doc.id ? 'Generating...' : 'Generate Fix'}
+                                </button>
+                              )}
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleReAnalyse(doc.id) }}
+                                disabled={reanalysingId === doc.id}
+                                className="text-sm font-medium text-blue-600 hover:text-blue-800 disabled:opacity-50 flex items-center gap-1"
+                              >
+                                <RefreshCw className={`h-3.5 w-3.5 ${reanalysingId === doc.id ? 'animate-spin' : ''}`} />
+                                {reanalysingId === doc.id ? 'Analysing...' : 'Re-analyse'}
+                              </button>
                               <button
                                 onClick={(e) => { e.stopPropagation(); handleReEvaluate(doc.id) }}
                                 disabled={evaluatingId === doc.id}
-                                className="text-sm text-blue-600 hover:text-blue-800 disabled:opacity-50"
+                                className="text-sm text-slate-600 hover:text-slate-900 disabled:opacity-50"
                               >
                                 {evaluatingId === doc.id ? 'Evaluating...' : 'Re-evaluate'}
                               </button>
@@ -401,6 +519,92 @@ export default function DocumentsPage() {
                               </div>
                             )}
 
+                            {/* Analysis loading state */}
+                            {isLoadingAnalysis && (
+                              <p className="text-xs text-slate-400">Loading analysis...</p>
+                            )}
+
+                            {/* Analysis results */}
+                            {analysis && (
+                              <div className="space-y-4">
+                                {/* Sections found */}
+                                {(analysis.sections as string[])?.length > 0 && (
+                                  <div>
+                                    <p className="text-xs font-medium uppercase tracking-wide text-slate-500 mb-2">
+                                      Sections found ({(analysis.sections as string[]).length})
+                                    </p>
+                                    <ul className="space-y-1">
+                                      {(analysis.sections as string[]).map((s, i) => (
+                                        <li key={i} className="text-sm text-slate-700 flex items-start gap-2">
+                                          <span className="text-slate-400">•</span> {s}
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                )}
+
+                                {/* Concerns */}
+                                {(analysis.concerns as string[])?.length > 0 && (
+                                  <div>
+                                    <p className="text-xs font-medium uppercase tracking-wide text-slate-500 mb-2">
+                                      Concerns ({(analysis.concerns as string[]).length})
+                                    </p>
+                                    <div className="space-y-1">
+                                      {(analysis.concerns as string[]).map((c, i) => (
+                                        <p key={i} className="text-sm text-[#d97706]">⚠ {c}</p>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Checklist items VERIFIED */}
+                                {(() => {
+                                  const verified = (analysis.checklistMapping as Array<{ checklistId: string; confidence: string; evidenceQuote: string }>)?.filter(m => m.confidence === 'VERIFIED') || []
+                                  const partial = (analysis.checklistMapping as Array<{ checklistId: string; confidence: string; evidenceQuote: string }>)?.filter(m => m.confidence === 'PARTIAL') || []
+                                  return (
+                                    <>
+                                      {verified.length > 0 && (
+                                        <div>
+                                          <p className="text-xs font-medium uppercase tracking-wide text-slate-500 mb-2">
+                                            Checklist items (verified)
+                                          </p>
+                                          <div className="space-y-1.5">
+                                            {verified.map((m, i) => (
+                                              <div key={i} className="flex items-start gap-2">
+                                                <span className="h-2 w-2 rounded-full bg-[#059669] mt-1.5 shrink-0" />
+                                                <div className="min-w-0">
+                                                  <span className="text-sm text-slate-700 font-medium">{m.checklistId}</span>
+                                                  <span className="text-sm text-slate-500"> — &ldquo;{m.evidenceQuote.length > 80 ? m.evidenceQuote.slice(0, 80) + '...' : m.evidenceQuote}&rdquo;</span>
+                                                </div>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
+                                      {partial.length > 0 && (
+                                        <div>
+                                          <p className="text-xs font-medium uppercase tracking-wide text-slate-500 mb-2">
+                                            Checklist items (partial)
+                                          </p>
+                                          <div className="space-y-1.5">
+                                            {partial.map((m, i) => (
+                                              <div key={i} className="flex items-start gap-2">
+                                                <span className="h-2 w-2 rounded-full bg-[#d97706] mt-1.5 shrink-0" />
+                                                <div className="min-w-0">
+                                                  <span className="text-sm text-slate-700 font-medium">{m.checklistId}</span>
+                                                  <span className="text-sm text-slate-500"> — &ldquo;{m.evidenceQuote.length > 80 ? m.evidenceQuote.slice(0, 80) + '...' : m.evidenceQuote}&rdquo;</span>
+                                                </div>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
+                                    </>
+                                  )
+                                })()}
+                              </div>
+                            )}
+
                             {/* Document preview */}
                             {doc.fileType?.includes('pdf') ? (
                               <iframe src={doc.fileUrl} className="w-full h-[500px] rounded-lg border border-slate-200" />
@@ -420,8 +624,8 @@ export default function DocumentsPage() {
                               </a>
                             )}
 
-                            {/* Checklist items satisfied */}
-                            {checklistItems.length > 0 && (
+                            {/* Checklist items satisfied (from checklist status, not analysis) */}
+                            {checklistItems.length > 0 && !analysis && (
                               <div>
                                 <p className="text-xs font-medium uppercase tracking-wide text-slate-500 mb-2">
                                   Checklist items satisfied ({checklistItems.length})

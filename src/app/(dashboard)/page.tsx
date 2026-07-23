@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { OnboardingRedirect } from './onboarding-redirect'
+import { CrossReferenceFlags } from './cross-reference-flags'
 
 interface Standard {
   code: string
@@ -151,6 +152,9 @@ export default async function DashboardPage() {
           </span>
         </div>
       </div>
+
+      {/* Cross-reference flags (client component) */}
+      {!isOnboarding && <CrossReferenceFlags />}
 
       {/* Attention Required */}
       <div className="rounded-lg border border-slate-200 bg-white p-6">

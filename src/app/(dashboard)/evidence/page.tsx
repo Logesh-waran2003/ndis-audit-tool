@@ -22,6 +22,16 @@ interface ChecklistItemState {
   satisfied: boolean
   evidenceId: string | null
   satisfiedFrom: string | null
+  confidence?: string | null
+  concerns?: string | null
+}
+
+interface UploadAnalysis {
+  extractedTitle: string
+  documentType: string
+  qualityScore: number
+  sections: string[]
+  concerns: string[]
 }
 
 type UploadStep = 'idle' | 'uploading' | 'analysing' | 'done'
@@ -47,6 +57,7 @@ export default function EvidencePage() {
   const [expiryDate, setExpiryDate] = useState('')
   const [progress, setProgress] = useState('')
   const [generating, setGenerating] = useState<string | null>(null)
+  const [lastUploadAnalysis, setLastUploadAnalysis] = useState<UploadAnalysis | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
   const fetchChecklist = useCallback(async () => {
@@ -92,6 +103,7 @@ export default function EvidencePage() {
 
     setUploadStep('uploading')
     setProgress('Saving document...')
+    setLastUploadAnalysis(null)
 
     const formData = new FormData()
     formData.append('file', file)
@@ -127,16 +139,31 @@ export default function EvidencePage() {
         toast.success(`Mapped to ${count} checklist item${count !== 1 ? 's' : ''}`)
       }
     } catch {
-      // Non-fatal — background task will also run
+      // Non-fatal
+    }
+
+    // Also fetch full analysis if available (may have been triggered by upload)
+    try {
+      const analysisRes = await fetch(`/api/evidence/${evidenceId}/analysis`)
+      if (analysisRes.ok) {
+        const data = await analysisRes.json()
+        setLastUploadAnalysis({
+          extractedTitle: data.extractedTitle,
+          documentType: data.documentType,
+          qualityScore: data.qualityScore,
+          sections: data.sections || [],
+          concerns: data.concerns || [],
+        })
+      }
+    } catch {
+      // Non-fatal
     }
 
     setUploadStep('done')
     setProgress('')
-    // Refresh the checklist
     await fetchChecklist()
     router.refresh()
-    // Auto-reset after brief pause
-    setTimeout(resetUpload, 1500)
+    setTimeout(resetUpload, 3000)
   }
 
   async function handleGenerate(item: ChecklistItemState) {
@@ -157,7 +184,9 @@ export default function EvidencePage() {
       const a = document.createElement('a')
       a.href = url
       a.download = `${item.name}.docx`
+      document.body.appendChild(a)
       a.click()
+      document.body.removeChild(a)
       URL.revokeObjectURL(url)
       toast.success(`Generated: ${item.name}`)
     } catch {
@@ -167,10 +196,8 @@ export default function EvidencePage() {
   }
 
   function handleUploadFor(item: ChecklistItemState) {
-    // Pre-fill upload form for this specific checklist item
     setTitle(item.name)
     setCategory(getCategoryForItem(item))
-    // Scroll to upload zone / open it
     inputRef.current?.click()
   }
 
@@ -302,6 +329,27 @@ export default function EvidencePage() {
         )}
       </div>
 
+      {/* Last upload analysis results */}
+      {lastUploadAnalysis && (
+        <div className="rounded-lg border border-slate-200 bg-white p-4">
+          <h3 className="text-sm font-semibold text-slate-900 mb-2">
+            Analysis: {lastUploadAnalysis.extractedTitle}
+          </h3>
+          <div className="flex gap-4 text-xs text-slate-500 mb-3">
+            <span>Type: {lastUploadAnalysis.documentType?.replace(/_/g, ' ')}</span>
+            <span>Quality: <span className={lastUploadAnalysis.qualityScore >= 70 ? 'text-[#059669] font-medium' : 'text-[#d97706] font-medium'}>{lastUploadAnalysis.qualityScore}/100</span></span>
+            <span>Sections: {lastUploadAnalysis.sections?.length}</span>
+          </div>
+          {lastUploadAnalysis.concerns?.length > 0 && (
+            <div className="space-y-1">
+              {lastUploadAnalysis.concerns.map((c, i) => (
+                <p key={i} className="text-xs text-[#d97706]">⚠ {c}</p>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Checklist by category */}
       <div className="space-y-4">
         {Object.entries(categories).map(([cat, items]) => {
@@ -321,10 +369,12 @@ export default function EvidencePage() {
                       <div className="flex items-center gap-2.5 min-w-0">
                         {item.satisfied ? (
                           <span className="h-2 w-2 rounded-full bg-[#059669] shrink-0" />
+                        ) : item.confidence === 'PARTIAL' ? (
+                          <span className="h-2 w-2 rounded-full bg-[#d97706] shrink-0" />
                         ) : (
                           <span className="h-2 w-2 rounded-full bg-slate-300 shrink-0" />
                         )}
-                        <span className={`text-sm ${item.satisfied ? 'text-[#059669]' : 'text-slate-700'}`}>
+                        <span className={`text-sm ${item.satisfied ? 'text-[#059669]' : item.confidence === 'PARTIAL' ? 'text-[#d97706]' : 'text-slate-700'}`}>
                           {item.name}
                         </span>
                         {item.perWorker && (
@@ -335,6 +385,16 @@ export default function EvidencePage() {
                         )}
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
+                        {/* Confidence indicator */}
+                        {item.satisfied && item.confidence === 'VERIFIED' && (
+                          <span className="text-xs font-medium text-[#059669]">Verified</span>
+                        )}
+                        {item.confidence === 'PARTIAL' && (
+                          <span className="text-xs font-medium text-[#d97706]">Partial</span>
+                        )}
+                        {item.satisfied && item.confidence === 'TITLE_MATCH_ONLY' && (
+                          <span className="text-xs text-slate-400">Title match</span>
+                        )}
                         {/* in_tool items: show link */}
                         {item.type === 'in_tool' && TOOL_LINKS[item.id] && (
                           <Link
@@ -379,10 +439,15 @@ export default function EvidencePage() {
                         )}
                       </div>
                     </div>
-                    {/* Satisfied by line */}
+                    {/* Satisfied by line with confidence detail */}
                     {item.satisfied && item.satisfiedFrom && (
                       <p className="mt-1 ml-[18px] text-xs text-slate-400 italic">
-                        {item.satisfiedFrom}
+                        &ldquo;{item.satisfiedFrom}&rdquo;
+                      </p>
+                    )}
+                    {item.confidence === 'PARTIAL' && item.satisfiedFrom && !item.satisfied && (
+                      <p className="mt-1 ml-[18px] text-xs text-[#d97706]">
+                        &ldquo;{item.satisfiedFrom}&rdquo; — needs update
                       </p>
                     )}
                   </div>
