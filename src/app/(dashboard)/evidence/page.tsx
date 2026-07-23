@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { FileUp, X, Loader2, Upload, Download, ExternalLink } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { DatePicker } from '@/components/ui/date-picker'
 import { toast } from 'sonner'
 import Link from 'next/link'
 
@@ -26,17 +25,7 @@ interface ChecklistItemState {
   concerns?: string | null
 }
 
-interface UploadAnalysis {
-  extractedTitle: string
-  documentType: string
-  qualityScore: number
-  sections: string[]
-  concerns: string[]
-}
-
 type UploadStep = 'idle' | 'uploading' | 'analysing' | 'done'
-
-const CATEGORIES = ['POLICY', 'PARTICIPANT', 'WORKER', 'INCIDENT', 'SERVICE_DELIVERY', 'GOVERNANCE', 'OTHER'] as const
 
 const TOOL_LINKS: Record<string, { label: string; href: string }> = {
   'REG-CI': { label: 'View improvements', href: '/improvements' },
@@ -53,11 +42,8 @@ export default function EvidencePage() {
   const [uploadStep, setUploadStep] = useState<UploadStep>('idle')
   const [file, setFile] = useState<File | null>(null)
   const [title, setTitle] = useState('')
-  const [category, setCategory] = useState<string>('POLICY')
-  const [expiryDate, setExpiryDate] = useState('')
   const [progress, setProgress] = useState('')
   const [generating, setGenerating] = useState<string | null>(null)
-  const [lastUploadAnalysis, setLastUploadAnalysis] = useState<UploadAnalysis | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
   const fetchChecklist = useCallback(async () => {
@@ -88,8 +74,6 @@ export default function EvidencePage() {
     setUploadStep('idle')
     setFile(null)
     setTitle('')
-    setCategory('POLICY')
-    setExpiryDate('')
     setProgress('')
   }
 
@@ -103,13 +87,10 @@ export default function EvidencePage() {
 
     setUploadStep('uploading')
     setProgress('Saving document...')
-    setLastUploadAnalysis(null)
 
     const formData = new FormData()
     formData.append('file', file)
     formData.append('title', title)
-    formData.append('category', category)
-    if (expiryDate) formData.append('expiryDate', expiryDate)
 
     let evidenceId: string
     try {
@@ -142,28 +123,12 @@ export default function EvidencePage() {
       // Non-fatal
     }
 
-    // Also fetch full analysis if available (may have been triggered by upload)
-    try {
-      const analysisRes = await fetch(`/api/evidence/${evidenceId}/analysis`)
-      if (analysisRes.ok) {
-        const data = await analysisRes.json()
-        setLastUploadAnalysis({
-          extractedTitle: data.extractedTitle,
-          documentType: data.documentType,
-          qualityScore: data.qualityScore,
-          sections: data.sections || [],
-          concerns: data.concerns || [],
-        })
-      }
-    } catch {
-      // Non-fatal
-    }
-
+    // ponytail: analysis runs in background (15-30s), don't wait for it — just close form
     setUploadStep('done')
     setProgress('')
     await fetchChecklist()
     router.refresh()
-    setTimeout(resetUpload, 3000)
+    setTimeout(resetUpload, 2000)
   }
 
   async function handleGenerate(item: ChecklistItemState) {
@@ -197,16 +162,7 @@ export default function EvidencePage() {
 
   function handleUploadFor(item: ChecklistItemState) {
     setTitle(item.name)
-    setCategory(getCategoryForItem(item))
     inputRef.current?.click()
-  }
-
-  function getCategoryForItem(item: ChecklistItemState): string {
-    if (item.id.startsWith('STAFF-')) return 'WORKER'
-    if (item.id.startsWith('INS-')) return 'GOVERNANCE'
-    if (item.id.startsWith('PART-')) return 'PARTICIPANT'
-    if (item.id.startsWith('GOV-') || item.id.startsWith('REG-')) return 'POLICY'
-    return 'OTHER'
   }
 
   if (loading) {
@@ -276,30 +232,14 @@ export default function EvidencePage() {
                     <X className="h-4 w-4" />
                   </button>
                 </div>
-                <div className="grid grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium text-slate-600 mb-1">Title</label>
-                    <input
-                      type="text"
-                      value={title}
-                      onChange={e => setTitle(e.target.value)}
-                      className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-[#1a2332]/10"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-600 mb-1">Category</label>
-                    <select
-                      value={category}
-                      onChange={e => setCategory(e.target.value)}
-                      className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 pr-8 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#1a2332]/10"
-                    >
-                      {CATEGORIES.map(c => <option key={c} value={c}>{c.replace(/_/g, ' ')}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-600 mb-1">Expiry <span className="text-slate-400">(opt)</span></label>
-                    <DatePicker value={expiryDate} onChange={setExpiryDate} placeholder="Select date" />
-                  </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Title</label>
+                  <input
+                    type="text"
+                    value={title}
+                    onChange={e => setTitle(e.target.value)}
+                    className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-[#1a2332]/10"
+                  />
                 </div>
                 <Button
                   onClick={handleUploadAndAnalyse}
@@ -328,27 +268,6 @@ export default function EvidencePage() {
           </div>
         )}
       </div>
-
-      {/* Last upload analysis results */}
-      {lastUploadAnalysis && (
-        <div className="rounded-lg border border-slate-200 bg-white p-4">
-          <h3 className="text-sm font-semibold text-slate-900 mb-2">
-            Analysis: {lastUploadAnalysis.extractedTitle}
-          </h3>
-          <div className="flex gap-4 text-xs text-slate-500 mb-3">
-            <span>Type: {lastUploadAnalysis.documentType?.replace(/_/g, ' ')}</span>
-            <span>Quality: <span className={lastUploadAnalysis.qualityScore >= 70 ? 'text-[#059669] font-medium' : 'text-[#d97706] font-medium'}>{lastUploadAnalysis.qualityScore}/100</span></span>
-            <span>Sections: {lastUploadAnalysis.sections?.length}</span>
-          </div>
-          {lastUploadAnalysis.concerns?.length > 0 && (
-            <div className="space-y-1">
-              {lastUploadAnalysis.concerns.map((c, i) => (
-                <p key={i} className="text-xs text-[#d97706]">⚠ {c}</p>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
 
       {/* Checklist by category */}
       <div className="space-y-4">

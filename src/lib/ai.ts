@@ -1,10 +1,9 @@
 /**
  * AI Client — calls Vertex AI Gemini via the 24seven Flask backend proxy.
  * The proxy handles WIF authentication to GCP.
- *
- * Local dev: uses EC2 endpoint via CloudFront
- * Production: same endpoint (both apps on same infra)
  */
+
+import { logAICall } from './ai-logger'
 
 // ponytail: single proxy URL — the 24seven backend already has Vertex AI auth via WIF
 const GENAI_PROXY_URL = process.env.GENAI_PROXY_URL || 'https://d2yns7aqpsk9tu.cloudfront.net/24seven-api/api/genai'
@@ -12,8 +11,9 @@ const GENAI_PROXY_URL = process.env.GENAI_PROXY_URL || 'https://d2yns7aqpsk9tu.c
 export async function generateText(
   prompt: string,
   systemInstruction?: string,
-  opts?: { temperature?: number; maxOutputTokens?: number }
+  opts?: { temperature?: number; maxOutputTokens?: number; context?: string }
 ): Promise<{ text: string; isMock: boolean }> {
+  const startTime = Date.now()
   try {
     const res = await fetch(`${GENAI_PROXY_URL}/generate`, {
       method: 'POST',
@@ -29,11 +29,46 @@ export async function generateText(
     if (!res.ok) {
       const err = await res.text()
       console.warn('[AI] Proxy error:', res.status, err.substring(0, 200))
+      logAICall({
+        endpoint: `${GENAI_PROXY_URL}/generate`,
+        prompt, promptLength: prompt.length,
+        temperature: opts?.temperature ?? 0.3,
+        maxTokens: opts?.maxOutputTokens ?? 2048,
+        responseStatus: res.status,
+        responseText: err,
+        isMock: true,
+        durationMs: Date.now() - startTime,
+        error: `Proxy error ${res.status}`,
+        context: opts?.context || 'generateText',
+      })
       return { text: `[AI Proxy Error ${res.status}]\n\nFallback: ${prompt.substring(0, 100)}...`, isMock: true }
     }
     const data = await res.json()
+    logAICall({
+      endpoint: `${GENAI_PROXY_URL}/generate`,
+      prompt, promptLength: prompt.length,
+      temperature: opts?.temperature ?? 0.3,
+      maxTokens: opts?.maxOutputTokens ?? 2048,
+      responseStatus: res.status,
+      responseText: data.text || '',
+      responseLength: data.text?.length || 0,
+      isMock: false,
+      durationMs: Date.now() - startTime,
+      context: opts?.context || 'generateText',
+    })
     return { text: data.text || '', isMock: false }
   } catch (error) {
+    logAICall({
+      endpoint: `${GENAI_PROXY_URL}/generate`,
+      prompt, promptLength: prompt.length,
+      temperature: opts?.temperature ?? 0.3,
+      maxTokens: opts?.maxOutputTokens ?? 2048,
+      responseStatus: null,
+      isMock: true,
+      durationMs: Date.now() - startTime,
+      error: String(error),
+      context: opts?.context || 'generateText',
+    })
     console.warn('[AI] Proxy unreachable:', error)
     return { text: `[AI Unavailable - Proxy unreachable]\n\nEnsure the 24seven backend is running on EC2.`, isMock: true }
   }
