@@ -7,6 +7,7 @@ import { ChevronRight, Upload, FileUp, X, Loader2, Download, RefreshCw } from 'l
 import { Button } from '@/components/ui/button'
 import { DatePicker } from '@/components/ui/date-picker'
 import { PdfViewer } from '@/components/ui/pdf-viewer'
+import { DocxViewer } from '@/components/ui/docx-viewer'
 import { toast } from 'sonner'
 
 interface Evidence {
@@ -35,8 +36,8 @@ interface ChecklistItemState {
 interface DocumentAnalysis {
   documentType: string
   extractedTitle: string
-  sections: string[]
-  concerns: string[]
+  sections: Array<string | { heading?: string; summary?: string }>
+  concerns: Array<string | Record<string, unknown>>
   qualityScore: number | null
   checklistMapping: Array<{ checklistId: string; confidence: string; evidenceQuote: string }>
   analysedAt: string
@@ -430,47 +431,52 @@ export default function DocumentsPage() {
                             )}
 
                             {/* Action bar */}
-                            <div className="flex items-center gap-3">
-                              <a href={doc.fileUrl} download={doc.fileName} className="text-sm font-medium text-blue-600 hover:text-blue-800 flex items-center gap-1">
-                                <Download className="h-3.5 w-3.5" />
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <a
+                                href={doc.fileUrl}
+                                download={doc.fileName}
+                                onClick={e => e.stopPropagation()}
+                                className="inline-flex items-center gap-1.5 h-7 px-3 rounded-md border border-slate-300 bg-white text-xs font-medium text-slate-700 hover:bg-slate-50"
+                              >
+                                <Download className="h-3 w-3" />
                                 Download
                               </a>
-                              {analysis && (analysis.concerns as string[])?.length > 0 && (
+                              {analysis && (analysis.concerns as unknown[])?.length > 0 && (
                                 <button
                                   onClick={(e) => { e.stopPropagation(); handleGenerateFix(doc.id, analysis.concerns as string[]) }}
                                   disabled={generatingFix === doc.id}
-                                  className="text-sm font-medium text-blue-600 hover:text-blue-800 disabled:opacity-50 flex items-center gap-1"
+                                  className="inline-flex items-center gap-1.5 h-7 px-3 rounded-md border border-blue-200 bg-blue-50 text-xs font-medium text-blue-700 hover:bg-blue-100 disabled:opacity-50"
                                 >
-                                  <Download className="h-3.5 w-3.5" />
+                                  <Download className="h-3 w-3" />
                                   {generatingFix === doc.id ? 'Generating...' : 'Generate Fix'}
                                 </button>
                               )}
                               <button
                                 onClick={(e) => { e.stopPropagation(); handleReAnalyse(doc.id) }}
                                 disabled={reanalysingId === doc.id}
-                                className="text-sm font-medium text-blue-600 hover:text-blue-800 disabled:opacity-50 flex items-center gap-1"
+                                className="inline-flex items-center gap-1.5 h-7 px-3 rounded-md border border-slate-300 bg-white text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
                               >
-                                <RefreshCw className={`h-3.5 w-3.5 ${reanalysingId === doc.id ? 'animate-spin' : ''}`} />
+                                <RefreshCw className={`h-3 w-3 ${reanalysingId === doc.id ? 'animate-spin' : ''}`} />
                                 {reanalysingId === doc.id ? 'Analysing...' : 'Re-analyse'}
                               </button>
                               <button
                                 onClick={(e) => { e.stopPropagation(); handleReEvaluate(doc.id) }}
                                 disabled={evaluatingId === doc.id}
-                                className="text-sm text-slate-600 hover:text-slate-900 disabled:opacity-50"
+                                className="inline-flex items-center gap-1.5 h-7 px-3 rounded-md border border-slate-300 bg-white text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
                               >
                                 {evaluatingId === doc.id ? 'Evaluating...' : 'Re-evaluate'}
                               </button>
                               {!isEditing && (
                                 <button
                                   onClick={(e) => { e.stopPropagation(); startEditing(doc) }}
-                                  className="text-sm text-slate-600 hover:text-slate-900"
+                                  className="inline-flex items-center gap-1.5 h-7 px-3 rounded-md border border-slate-300 bg-white text-xs font-medium text-slate-700 hover:bg-slate-50"
                                 >
                                   Edit
                                 </button>
                               )}
                               <button
                                 onClick={(e) => { e.stopPropagation(); handleDelete(doc.id) }}
-                                className="text-sm text-red-500 hover:text-red-700"
+                                className="inline-flex items-center gap-1.5 h-7 px-3 rounded-md border border-red-200 bg-red-50 text-xs font-medium text-red-600 hover:bg-red-100"
                               >
                                 Delete
                               </button>
@@ -528,15 +534,15 @@ export default function DocumentsPage() {
                             {analysis && (
                               <div className="space-y-4">
                                 {/* Sections found */}
-                                {(analysis.sections as string[])?.length > 0 && (
+                                {(analysis.sections as unknown[])?.length > 0 && (
                                   <div>
                                     <p className="text-xs font-medium uppercase tracking-wide text-slate-500 mb-2">
-                                      Sections found ({(analysis.sections as string[]).length})
+                                      Sections found ({(analysis.sections as unknown[]).length})
                                     </p>
                                     <ul className="space-y-1">
-                                      {(analysis.sections as string[]).map((s, i) => (
+                                      {(analysis.sections as unknown[]).map((s, i) => (
                                         <li key={i} className="text-sm text-slate-700 flex items-start gap-2">
-                                          <span className="text-slate-400">•</span> {s}
+                                          <span className="text-slate-400">•</span> {typeof s === 'string' ? s : (s as { heading?: string; summary?: string }).heading || JSON.stringify(s)}
                                         </li>
                                       ))}
                                     </ul>
@@ -544,14 +550,14 @@ export default function DocumentsPage() {
                                 )}
 
                                 {/* Concerns */}
-                                {(analysis.concerns as string[])?.length > 0 && (
+                                {(analysis.concerns as unknown[])?.length > 0 && (
                                   <div>
                                     <p className="text-xs font-medium uppercase tracking-wide text-slate-500 mb-2">
-                                      Concerns ({(analysis.concerns as string[]).length})
+                                      Concerns ({(analysis.concerns as unknown[]).length})
                                     </p>
                                     <div className="space-y-1">
-                                      {(analysis.concerns as string[]).map((c, i) => (
-                                        <p key={i} className="text-sm text-[#d97706]">⚠ {c}</p>
+                                      {(analysis.concerns as unknown[]).map((c, i) => (
+                                        <p key={i} className="text-sm text-[#d97706]">⚠ {typeof c === 'string' ? c : JSON.stringify(c)}</p>
                                       ))}
                                     </div>
                                   </div>
@@ -607,15 +613,9 @@ export default function DocumentsPage() {
 
                             {/* Document preview */}
                             {doc.fileType?.includes('pdf') ? (
-                              <PdfViewer fileUrl={doc.fileUrl} fileName={doc.fileName} />
+                              <PdfViewer fileUrl={doc.fileUrl} fileName={doc.fileName} height="600px" />
                             ) : doc.fileType?.includes('word') || doc.fileName?.endsWith('.docx') ? (
-                              <div className="rounded-lg border border-slate-200 bg-slate-50 p-8 text-center">
-                                <p className="text-sm text-slate-600">DOCX preview not available in local development.</p>
-                                <p className="text-xs text-slate-400 mt-1">In production, documents will render inline via Office viewer.</p>
-                                <a href={doc.fileUrl} download={doc.fileName} className="inline-block mt-3 text-sm font-medium text-[#1a2332] underline">
-                                  Download to view in Word
-                                </a>
-                              </div>
+                              <DocxViewer fileUrl={doc.fileUrl} fileName={doc.fileName} height="600px" />
                             ) : doc.fileType?.startsWith('image/') ? (
                               <img src={doc.fileUrl} alt={doc.title} className="max-w-full max-h-[400px] rounded-lg border border-slate-200" />
                             ) : (

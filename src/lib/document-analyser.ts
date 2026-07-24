@@ -200,6 +200,84 @@ Return ONLY JSON:
 }
 
 // ═══════════════════════════════════════════
+// FAST PASS: Quick classification from first 2000 chars.
+// Marks checklist items as PARTIAL within 5-10 seconds.
+// Deep pass (analyseDocumentFull) will upgrade to VERIFIED later.
+// ═══════════════════════════════════════════
+export async function fastClassify(evidenceId: string) {
+  const evidence = await prisma.evidence.findUnique({ where: { id: evidenceId } })
+  if (!evidence) return
+
+  console.log(`[fastClassify] Starting quick scan of "${evidence.fileName}"...`)
+  const startTime = Date.now()
+
+  const text = await getDocumentText(evidence)
+  if (!text || text.length < 20) {
+    console.warn('[fastClassify] No content extracted')
+    return
+  }
+  const snippet = text.substring(0, 2000)
+
+  const checklistList = AUDIT_CHECKLIST.map(i => `${i.id}: ${i.name}${i.perWorker ? ' [per-worker doc needed]' : ''}`).join('\n')
+
+  const prompt = `Read this document snippet quickly. Determine:
+1. What TYPE of document is this? Choose one: policy_manual, insurance_certificate, worker_screening_certificate, service_agreement, risk_register, meeting_minutes, training_certificate, business_plan, organisation_chart, position_description, code_of_conduct_signed, other
+
+2. Which checklist items does it LIKELY satisfy? Only include items you're fairly confident about from reading the snippet. Do NOT include per-worker items (marked [per-worker doc needed]) unless this appears to be an actual individual certificate/signed document for a specific person.
+
+Checklist items:
+${checklistList}
+
+Document filename: "${evidence.fileName}"
+First 2000 characters:
+${snippet}
+
+Return ONLY JSON:
+{"type": "policy_manual", "likelySatisfies": ["GOV-POLICY", "REG-RISK"]}`
+
+  const result = await generateText(prompt, undefined, { temperature: 0.1, maxOutputTokens: 512, context: 'fastClassify' })
+
+  if (result.isMock) {
+    console.warn('[fastClassify] AI unavailable')
+    return
+  }
+
+  try {
+    let cleaned = result.text.trim()
+    if (cleaned.startsWith('```')) cleaned = cleaned.substring(cleaned.indexOf('\n') + 1)
+    if (cleaned.endsWith('```')) cleaned = cleaned.substring(0, cleaned.lastIndexOf('```'))
+    const parsed = JSON.parse(cleaned.trim())
+
+    if (parsed.type) {
+      await prisma.evidence.update({
+        where: { id: evidenceId },
+        data: { category: mapTypeToCategory(parsed.type) as any }
+      })
+    }
+
+    // Mark checklist items as PARTIAL (quick scan, not fully verified yet)
+    const validIds = new Set(AUDIT_CHECKLIST.map(i => i.id))
+    const likelySatisfies = (parsed.likelySatisfies || []).filter((id: string) => validIds.has(id))
+
+    for (const checklistId of likelySatisfies) {
+      const existing = await prisma.checklistStatus.findUnique({ where: { checklistId } })
+      // Don't downgrade VERIFIED items from previous deep analysis
+      if (!existing || (existing.confidence !== 'VERIFIED')) {
+        await prisma.checklistStatus.upsert({
+          where: { checklistId },
+          update: { satisfied: true, confidence: 'PARTIAL', evidenceId, satisfiedFrom: 'Quick scan — full verification pending' },
+          create: { checklistId, satisfied: true, confidence: 'PARTIAL', evidenceId, satisfiedFrom: 'Quick scan — full verification pending' },
+        })
+      }
+    }
+
+    console.log(`[fastClassify] ✓ Quick scan done in ${Date.now() - startTime}ms: type=${parsed.type}, likely=${likelySatisfies.length} items`)
+  } catch (err) {
+    console.warn('[fastClassify] Could not parse response:', err)
+  }
+}
+
+// ═══════════════════════════════════════════
 // MAIN PIPELINE: Orchestrates all 4 prompts
 // ═══════════════════════════════════════════
 export async function analyseDocumentFull(evidenceId: string) {
